@@ -15,7 +15,8 @@ import (
 
 	"github.com/BurntSushi/toml"
 	// "github.com/stianeikeland/go-rpio"
-	"github.com/GeertJohan/go.rice"
+	
+	// "github.com/GeertJohan/go.rice"
 	
 	/* "gobot.io/x/gobot"
 	"gobot.io/x/gobot/drivers/gpio"
@@ -30,6 +31,28 @@ var config = Config{}
 type Config struct {
 	Server   string
 	Database string
+}
+
+type FileSystem struct {
+	fs http.FileSystem
+}
+
+// Open opens file
+func (fs FileSystem) Open(path string) (http.File, error) {
+	f, err := fs.fs.Open(path)
+	if err != nil {
+		return nil, err
+	}
+
+	s, err := f.Stat()
+	if s.IsDir() {
+		index := strings.TrimSuffix(path, "/") + "/index.html"
+		if _, err := fs.fs.Open(index); err != nil {
+			return nil, err
+		}
+	}
+
+	return f, nil
 }
 
 // Read and parse the configuration file
@@ -91,6 +114,100 @@ func loggingMiddleware(next http.Handler) http.Handler {
 }
 
 func main() {
+	infinite_wait := make(chan string)
+
+	/* if err := rpio.Open(); err != nil {
+		panic(err)
+	}
+	defer rpio.Close() */
+	
+	r := mux.NewRouter()
+	
+	// serving api
+	apiPrefix := "/api/"
+	devicePrefix := apiPrefix + "device/"
+	fieldPrefix := apiPrefix + "field/"
+	plantPrefix := apiPrefix + "plant/"
+	camPrefix := apiPrefix + "cam/"
+
+	/* Mapper API */
+
+	/* Device */
+	r.HandleFunc(devicePrefix+"list", DeviceList).Methods("GET", "POST")
+	r.HandleFunc(camPrefix+"list", CamList).Methods("GET", "POST")
+	r.HandleFunc(fieldPrefix+"list", FieldList).Methods("GET", "POST")
+	r.HandleFunc(plantPrefix+"list", PlantList).Methods("GET", "POST")
+
+	r.HandleFunc(devicePrefix+"on/{pin}", PinOn).Methods("GET", "POST")
+	r.HandleFunc(devicePrefix+"off/{pin}", PinOff).Methods("GET", "POST")
+	
+	// implement DEVICE-ID /status /detail /get-sensor /set-control
+	r.HandleFunc(devicePrefix+"{device_id}/status", DeviceStatusHdr).Methods("GET", "POST")
+	// r.HandleFunc(devicePrefix + "{device_id}/detail", DeviceDetail).Methods("POST")
+	// r.HandleFunc(devicePrefix + "{device_id}/get-sensor", DeviceGetSensor).Methods("POST")
+	// r.HandleFunc(devicePrefix + "{device_id}/set-control", DeviceSetControl).Methods("POSt")
+
+	// // implement by-factor
+	r.HandleFunc(devicePrefix+"by-factor/air-temperature", DeviceFactorAirTemp).Methods("GET", "POST")
+	// r.HandleFunc(devicePrefix + "by-factor/air-humidity", DeviceFactorAirHumi).Methods("POST")
+	// r.HandleFunc(devicePrefix + "by-factor/soil-humidity", DeviceFactorSoilHumi).Methods("POST")
+	// r.HandleFunc(devicePrefix + "by-factor/light-intensity", DeviceFactorLightInten).Methods("POST")
+
+	// implementing CAMERA-ID + /picture /info /status
+	r.HandleFunc(apiPrefix+camPrefix+"/camId", CamList).Methods("GET", "POST")
+	// r.HandleFunc(apiPrefix + "desk/v1/delete", DeleteDesk).Methods("POST")
+
+	/* Automator API */
+
+	// implementing FIELD-ID /plant-list /device-list
+	r.HandleFunc(fieldPrefix+"{field_id}", FieldData).Methods("GET", "POST")
+	// r.HandleFunc(fieldPrefix + "{field_id}/plant-list", FieldPlantList).Methods("POST")
+	// r.HandleFunc(fieldPrefix + "{field_id}/device-list", FieldDeviceList).Methods("POST")
+
+	// implementing PLANT-ID /device-list
+	r.HandleFunc(plantPrefix+"{plant_id}", PlantData).Methods("GET", "POST")
+	// r.HandleFunc(plantPrefix + "{plant_id}/device-list", PlantDeviceList).Methods("POST")
+	
+	
+	c := cors.New(cors.Options{
+		AllowedMethods:     []string{"GET", "POST", "PUT", "HEAD", "OPTIONS"}, //
+		AllowedOrigins:     []string{"*"},
+		AllowCredentials:   true,
+		AllowedHeaders:     []string{"Content-Type", "Bearer", "Bearer ", "content-type", "Origin", "Accept"},
+		OptionsPassthrough: false,
+	})	
+	go http.ListenAndServe(":3030", loggingMiddleware(c.Handler(r)))
+	
+	// box := rice.MustFindBox("web-app")
+	// webappFileServer := http.StripPrefix("/", http.FileServer(box.HTTPBox()))
+	// r.PathPrefix("/").Handler(http.FileServer(rice.MustFindBox("web-app").HTTPBox()))
+	// fs := http.FileServer(http.Dir("web-app"))
+	// webapp := http.NewServeMux()
+	webapp := mux.NewRouter()
+	// webapp.Handle("/", fs)
+	webapp.PathPrefix("/").Handler(http.FileServer(http.Dir("./web-app/")))
+	
+	cwa := cors.New(cors.Options{
+		AllowedMethods:     []string{"GET", "POST", "PUT", "HEAD", "OPTIONS"}, //
+		AllowedOrigins:     []string{"*"},
+		AllowCredentials:   true,
+		AllowedHeaders:     []string{"Content-Type", "Bearer", "Bearer ", "content-type", "Origin", "Accept"},
+		OptionsPassthrough: false,
+	})	
+	go http.ListenAndServe(":80", cwa.Handler(webapp))
+	
+	log.Println("Serving NAAS Web Application + API")
+	
+	<-infinite_wait
+	
+}
+
+/* // return 405 for PUT, PATCH and DELETE
+r.HandleFunc("/users", status(405, "GET", "POST")).Methods("PUT", "PATCH", "DELETE")
+*/
+/* Serving Web App Folder */
+
+
 
 	// pi := raspi.NewAdaptor()
 	
@@ -128,10 +245,7 @@ func main() {
 	sv3 := gpio.NewLedDriver(pi, devices[3].Pin)
 	sv4 := gpio.NewLedDriver(pi, devices[4].Pin) */
 	
-	/* if err := rpio.Open(); err != nil {
-		panic(err)
-	}
-	defer rpio.Close() */
+	
 	
 	/*sv1 := rpio.Pin(devices[1].Pin)
 	sv2 := rpio.Pin(devices[2].Pin)
@@ -152,80 +266,3 @@ func main() {
 
 	robot.Start() */
 	
-	r := mux.NewRouter()
-
-	// r.HandleFunc("/", serveWebApp).Methods("GET")
-	
-	// serving api
-	apiPrefix := "/api/"
-	devicePrefix := apiPrefix + "device/"
-	fieldPrefix := apiPrefix + "field/"
-	plantPrefix := apiPrefix + "plant/"
-	camPrefix := apiPrefix + "cam/"
-
-	/* Mapper API */
-
-	/* Device */
-	r.HandleFunc(devicePrefix+"list", DeviceList).Methods("POST")
-	r.HandleFunc(camPrefix+"list", CamList).Methods("POST")
-	r.HandleFunc(fieldPrefix+"list", FieldList).Methods("POST")
-	r.HandleFunc(plantPrefix+"list", PlantList).Methods("POST")
-
-	// implement DEVICE-ID /status /detail /get-sensor /set-control
-	r.HandleFunc(devicePrefix+"{device_id}/status", DeviceStatusHdr).Methods("POST")
-	// r.HandleFunc(devicePrefix + "{device_id}/detail", DeviceDetail).Methods("POST")
-	// r.HandleFunc(devicePrefix + "{device_id}/get-sensor", DeviceGetSensor).Methods("POST")
-	// r.HandleFunc(devicePrefix + "{device_id}/set-control", DeviceSetControl).Methods("POSt")
-
-	// // implement by-factor
-	r.HandleFunc(devicePrefix+"by-factor/air-temperature", DeviceFactorAirTemp).Methods("POST")
-	// r.HandleFunc(devicePrefix + "by-factor/air-humidity", DeviceFactorAirHumi).Methods("POST")
-	// r.HandleFunc(devicePrefix + "by-factor/soil-humidity", DeviceFactorSoilHumi).Methods("POST")
-	// r.HandleFunc(devicePrefix + "by-factor/light-intensity", DeviceFactorLightInten).Methods("POST")
-
-	// implementing CAMERA-ID + /picture /info /status
-	r.HandleFunc(apiPrefix+camPrefix+"/camId", CamList).Methods("POST")
-	// r.HandleFunc(apiPrefix + "desk/v1/delete", DeleteDesk).Methods("POST")
-
-	/* Automator API */
-
-	// implementing FIELD-ID /plant-list /device-list
-	r.HandleFunc(fieldPrefix+"{field_id}", FieldData).Methods("POST")
-	// r.HandleFunc(fieldPrefix + "{field_id}/plant-list", FieldPlantList).Methods("POST")
-	// r.HandleFunc(fieldPrefix + "{field_id}/device-list", FieldDeviceList).Methods("POST")
-
-	// implementing PLANT-ID /device-list
-	r.HandleFunc(plantPrefix+"{plant_id}", PlantData).Methods("POST")
-	// r.HandleFunc(plantPrefix + "{plant_id}/device-list", PlantDeviceList).Methods("POST")
-	
-	r.HandleFunc(devicePrefix+"/on/{pin}", PinOn).Methods("GET")
-	r.HandleFunc(devicePrefix+"/off/{pin}", PinOff).Methods("GET")
-	
-	box := rice.MustFindBox("web-app")
-	webappFileServer := http.StripPrefix("/css/", http.FileServer(box.HTTPBox()))
-	r.PathPrefix("/").Handler(http.FileServer(rice.MustFindBox("web-app").HTTPBox()))
-	r.HandleFunc("/", http.FileServer(rice.MustFindBox("web-app").HTTPBox())).Methods("GET")
-
-	r.HandleFunc("/", webappFileServer).Methods("GET")
-	
-	c := cors.New(cors.Options{
-		AllowedMethods:     []string{"GET", "POST", "PUT", "HEAD", "OPTIONS"}, //
-		AllowedOrigins:     []string{"*"},
-		AllowCredentials:   true,
-		AllowedHeaders:     []string{"Content-Type", "Bearer", "Bearer ", "content-type", "Origin", "Accept"},
-		OptionsPassthrough: false,
-	})
-
-	if err := http.ListenAndServe(":80", loggingMiddleware(c.Handler(r))); err != nil {
-		log.Fatal(err)
-	}
-	log.Println("Serving NAAS Web Application + API")
-
-}
-
-/* // return 405 for PUT, PATCH and DELETE
-r.HandleFunc("/users", status(405, "GET", "POST")).Methods("PUT", "PATCH", "DELETE")
-*/
-/* Serving Web App Folder */
-
-
