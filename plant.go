@@ -1,30 +1,23 @@
 package main
 
-/* import (
-	"encoding/json"
-	"fmt"
+import (
+	// "encoding/json"
+	// "fmt"
 	"log"
 	"net/http"
+	// "gopkg.in/mgo.v2/bson"
+)
 
-	"gopkg.in/mgo.v2/bson"
-) */
-
-/* func CreateFile(w http.ResponseWriter, r *http.Request) {
+func PlantList(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
-	var file models.IFile
-	if err := json.NewDecoder(r.Body).Decode(&file); err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
-		return
-	}
-	log.Println("CreateProject: ")
-	file.Id = bson.NewObjectId()
-	// file.AppId = bson.ObjectIdHex(file.AppId.(string))
-	if file.FileIndexId != "" {
-		file.FileIndexId = bson.NewObjectId()
-	}
-	if err := mgcli.FileInsert(file); err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	respondWithJson(w, http.StatusCreated, file)
- }*/
+	log.Println("PlantList")
+
+	respondWithJson(w, http.StatusCreated, "PlantList")
+}
+
+func PlantData(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	log.Println("PlantData")
+
+	respondWithJson(w, http.StatusCreated, "PlantData")
+}

@@ -1,113 +1,140 @@
 package main
 
-// type (
-// 	Field struct {
-// 		FieldId 			string		`bson:"Match,omitempty" json:"Match,omitempty"`
-// 		Name					string		`bson:"Match,omitempty" json:"Match,omitempty"`
-		
-// 		GroundWidth 	uint8			`bson:"Match,omitempty" json:"Match,omitempty"`
-//     GroundDepth 	uint8			`bson:"Match,omitempty" json:"Match,omitempty"`
-//     GroundHeight 	uint8			`bson:"Match,omitempty" json:"Match,omitempty"`
-//     AirHeight			uint8			`bson:"Match,omitempty" json:"Match,omitempty"`
-
-// 		/* Plant ids */
-// 		Plants 				[]string	`bson:"Match,omitempty" json:"Match,omitempty"`
-		
-// 		/* Device id */
-// 		Devices 			[]string	`bson:"Match,omitempty" json:"Match,omitempty"`
-		
-// 	}
-
-// 	Device struct {
-// 		DeviceId 		string 				`bson:"Match,omitempty" json:"Match,omitempty"`
-// 		Name 				string 				`bson:"Match,omitempty" json:"Match,omitempty"`
-		
-// 		Kind			// ENUM SENSOR, ACTUATOR
-
-// 		/* These are for sensor */
-// 		Factor			// ENUM				`bson:"Match,omitempty" json:"Match,omitempty"`
-// 		Unit				// ENUM				`bson:"Match,omitempty" json:"Match,omitempty"`
-
-// 		/* This is for actuator */
-// 		ControlScheme // ENUM			`bson:"Match,omitempty" json:"Match,omitempty"`
-		
-// 		/* These are for sensor */
-// 		ValueState
-// 		BoolState
-		
-// 	}
-
-// 	Plant struct {
-// 		PlantId			string				`bson:"Match,omitempty" json:"Match,omitempty"`
-//     Name				string				`bson:"Match,omitempty" json:"Match,omitempty"`
-
-// 		/* string point to device id */
-//     Devices			[]string			`bson:"Match,omitempty" json:"Match,omitempty"`
+type (
 	
-// 		Genus				string				`bson:"Match,omitempty" json:"Match,omitempty"`
-//     Species			string				`bson:"Match,omitempty" json:"Match,omitempty"`
-//     LifeCycle		uint8					`bson:"Match,omitempty" json:"Match,omitempty"`
-		
-// 		// Mineral										`bson:"Match,omitempty" json:"Match,omitempty"`
-		
-//     // PreferredSoilHumidity			`bson:"Match,omitempty" json:"Match,omitempty"`
+	DeviceStatus uint16
+	DeviceKind uint16
+	ControlScheme uint16
 	
-// 		// PreferredAirHumidity 			`bson:"Match,omitempty" json:"Match,omitempty"`
- 
-// 		// PreferredAirTemperature 	`bson:"Match,omitempty" json:"Match,omitempty"`
+	ValueManipulation uint8
+	
+	Field struct {
+		FieldId string `bson:"Match,omitempty" json:"Match,omitempty"`
+		Name string `bson:"Match,omitempty" json:"Match,omitempty"`
+		
+		GroundWidth int `bson:"Match,omitempty" json:"Match,omitempty"`
+		GroundDepth int `bson:"Match,omitempty" json:"Match,omitempty"`
+		GroundHeight int `bson:"Match,omitempty" json:"Match,omitempty"`
+		AirHeight int `bson:"Match,omitempty" json:"Match,omitempty"`
 
-// 	}
+		/* Plant ids */
+		Plants []string `bson:"Match,omitempty" json:"Match,omitempty"`
+		
+		/* Device id */
+		Devices []string `bson:"Match,omitempty" json:"Match,omitempty"`
+		
+	}
+
+	Device struct {
+		DeviceId string `bson:"DeviceId" json:"DeviceId"`
+		Name string `bson:"Name,omitempty" json:"Name,omitempty"`
+
+		// ENUM ACTIVE, INACTIVE, ERROR
+		Status uint16 `bson:"Status,omitempty" json:"Status,omitempty"`
+		
+		// ENUM SENSOR, ACTUATOR
+		Kind uint16 `bson:"Kind,omitempty" json:"Kind,omitempty"`
+
+		/* These are for sensor */
+		Factor uint16 `bson:"Factor,omitempty" json:"Factor,omitempty"`
+		Unit uint16 `bson:"Unit,omitempty" json:"Unit,omitempty"`
+
+		/* This is for actuator */
+		ControlScheme uint16 `bson:"ControlScheme,omitempty" json:"ControlScheme,omitempty"`
+		
+		/* These are for sensor */
+		ValueState uint16 `bson:"ValueState,omitempty" json:"ValueState,omitempty"`
+		BoolState uint16 `bson:"BoolState,omitempty" json:"BoolState,omitempty"`
 	
-// 	ControlCondition struct {
+		/* Associated pin */
+		Pin	uint8 `bson:"Pin,omitempty" json:"Pin,omitempty"`
+	}
+
+	// Plant struct {
 		
-// 		SensorDevices	[]string
+	// 	PlantId string `bson:"PlantId,omitempty" json:"PlantId,omitempty"`
+	// 	Name string `bson:"Name,omitempty" json:"Name,omitempty"`
+
+	// 	/* string point to device id */
+	// 	Devices []string `bson:"Devices,omitempty" json:"Devices,omitempty"`
 		
-// 		ActuatorDevices	[]string
-		
-// 		ControlScheme	// ENUM BOOL, 
+	// 	// Genus string `bson:"Genus,omitempty" json:"Genus,omitempty"`
+	// 	// Species string `bson:"Species,omitempty" json:"Species,omitempty"`
+	// 	// LifeCycle uint8 `bson:"LifeCycle,omitempty" json:"LifeCycle,omitempty"`
+	// 	// Mineral `bson:"Match,omitempty" json:"Match,omitempty"`
+	// 	// PreferredSoilHumidity `bson:"Match,omitempty" json:"Match,omitempty"`
+	// 	// PreferredAirHumidity `bson:"Match,omitempty" json:"Match,omitempty"`
+	// 	// PreferredAirTemperature `bson:"Match,omitempty" json:"Match,omitempty"`
+
+	// }
 	
-// 		/* TimeType
-// 				Period
-// 					Daily
-// 					Weekly
-// 					Monthly
-// 				Ondemand 
-// 		*/
-// 		TimeType		// ENUM
+	// Controller struct {
+	// 	SensorDevices []string `bson:"SensorDevices,omitempty" json:"SensorDevices,omitempty"`
+	// 	ActuatorDevices []string `bson:"ActuatorDevices,omitempty" json:"ActuatorDevices,omitempty"`
 		
-// 		// Daytime HH:MM:SS
-// 		DaytimeStart	//
-// 		DaytimeEnd		//
+	// 	// ENUM BOOL, VALUE 
+	// 	ControlScheme `bson:"ControlScheme,omitempty" json:"ControlScheme,omitempty"`
 		
-// 		/* optional Season Start Date - End Date 
-// 			Date DD:MM:YYYY in YYYY in CE (common era)
-// 		*/
+	// 	/* ENUM
+	// 	TIME_BASED
+	// 	VALUE_BASED
+	// 	*/
+	// 	Policy uint16 `bson:"Policy,omitempty" json:"Policy,omitempty"`	
 		
-// 		SessionStartDate	
-// 		SeasonEndDate
+	// 	/* ENUM
+	// 	TimeType
+	// 	Period
+	// 	Daily
+	// 	Weekly
+	// 	Monthly
+	// 	Ondemand
+	// 	*/
+	// 	TimeType Date `bson:"TimeType,omitempty" json:"TimeType,omitempty"`
 		
-			
-// 		/* value manipulation capability of device */
-// 		ValueManipulation	// ENUM INCREASE, DECREASE, BOTH
+	// 	// Daytime HH:MM:SS
+	// 	DaytimeStart `bson:"DaytimeStart,omitempty" json:"DaytimeStart,omitempty"`
+	// 	DaytimeEnd `bson:"DaytimeEnd,omitempty" json:"DaytimeEnd,omitempty"`
 		
-// 		/* Range value optimization 
-// 		NAAS allows the value to fructuate between PreferredMin and PreferredMax
-// 		When it could only increase value, PreferredMin is evaluated if the value is below.
-// 		When it could only decrease value, PreferredMax is evaluated if the value is above.
-// 		If device can manipulate in both directions, both PreferredMin and PreferredMax are evaluated for control. 
-// 		When, OptimalVal is set, controlling device would leave manipulating the value */
+	// 	/* optional Season Start Date - End Date
+	// 	Date DD:MM:YYYY in YYYY in CE (common era)
+	// 	*/
+	// 	SessionStartDate	`bson:"SessionStartDate,omitempty" json:"SessionStartDate,omitempty"`
+	// 	SeasonEndDate			`bson:"SeasonEndDate,omitempty" json:"SeasonEndDate,omitempty"`
 		
-// 		// optimization is stop at this value
-// 		OptimalVal
+	// 	/*
+	// 	value manipulation capability of device
+	// 	interface for a device are increase(), decrease()
+	// 	ENUM INCREASE, DECREASE, BOTH
+	// 	*/
+	// 	ValueManipulation uint8 `bson:"ValueManipulation,omitempty" json:"ValueManipulation,omitempty"` 
 		
-// 		PreferredMin
+	// 	/* Range value optimization
+	// 	NAAS allows the value to fructuate between PreferredMin and PreferredMax
+	// 	When it could only increase value, PreferredMin is evaluated if the value is below.
+	// 	When it could only decrease value, PreferredMax is evaluated if the value is above.
+	// 	If device can manipulate in both directions, both PreferredMin and PreferredMax are evaluated for control.
+	// 	When, OptimalVal is set, controlling device would leave manipulating the value */
+	// 	// optimization is stop at this value
+	// 	OptimalVal	uint
+	// 	PreferredMin	uint
+	// 	PreferredMax	uint
 		
-// 		PreferredMax
+	// 	// true/false
+	// 	// This setting constrained by time period, not by value
+	// 	PreferState	
 		
-// 		// true/false
-// 		// This setting constrains by time period, not by value
-// 		PreferState
-		
-// 	}
+	// }
 	
-// }
+)
+
+// const (
+// 	INACTIVE DeviceStatus = iota
+// 	ACTIVE
+// 	ERROR	
+// )
+
+// const (
+// 	INACTIVE DeviceStatus = iota
+// 	ACTIVE
+// 	ERROR	
+// )
