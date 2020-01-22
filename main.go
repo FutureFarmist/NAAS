@@ -14,8 +14,8 @@ import (
 	"github.com/rs/cors"
 
 	"github.com/BurntSushi/toml"
-	"github.com/stianeikeland/go-rpio"
-	// "github.com/GeertJohan/go.rice"
+	// "github.com/stianeikeland/go-rpio"
+	"github.com/GeertJohan/go.rice"
 	
 	/* "gobot.io/x/gobot"
 	"gobot.io/x/gobot/drivers/gpio"
@@ -128,10 +128,11 @@ func main() {
 	sv3 := gpio.NewLedDriver(pi, devices[3].Pin)
 	sv4 := gpio.NewLedDriver(pi, devices[4].Pin) */
 	
-	if err := rpio.Open(); err != nil {
+	/* if err := rpio.Open(); err != nil {
 		panic(err)
 	}
-	defer rpio.Close()
+	defer rpio.Close() */
+	
 	/*sv1 := rpio.Pin(devices[1].Pin)
 	sv2 := rpio.Pin(devices[2].Pin)
 	sv3 := rpio.Pin(devices[3].Pin)
@@ -153,8 +154,8 @@ func main() {
 	
 	r := mux.NewRouter()
 
-	r.HandleFunc("/", serveWebApp).Methods("GET")
-
+	// r.HandleFunc("/", serveWebApp).Methods("GET")
+	
 	// serving api
 	apiPrefix := "/api/"
 	devicePrefix := apiPrefix + "device/"
@@ -200,6 +201,13 @@ func main() {
 	r.HandleFunc(devicePrefix+"/on/{pin}", PinOn).Methods("GET")
 	r.HandleFunc(devicePrefix+"/off/{pin}", PinOff).Methods("GET")
 	
+	box := rice.MustFindBox("web-app")
+	webappFileServer := http.StripPrefix("/css/", http.FileServer(box.HTTPBox()))
+	r.PathPrefix("/").Handler(http.FileServer(rice.MustFindBox("web-app").HTTPBox()))
+	r.HandleFunc("/", http.FileServer(rice.MustFindBox("web-app").HTTPBox())).Methods("GET")
+
+	r.HandleFunc("/", webappFileServer).Methods("GET")
+	
 	c := cors.New(cors.Options{
 		AllowedMethods:     []string{"GET", "POST", "PUT", "HEAD", "OPTIONS"}, //
 		AllowedOrigins:     []string{"*"},
@@ -219,8 +227,5 @@ func main() {
 r.HandleFunc("/users", status(405, "GET", "POST")).Methods("PUT", "PATCH", "DELETE")
 */
 /* Serving Web App Folder */
-// box := rice.MustFindBox("web-app")
-// webappFileServer := http.StripPrefix("/css/", http.FileServer(box.HTTPBox()))
-// r.PathPrefix("/").Handler(http.FileServer(rice.MustFindBox("web-app").HTTPBox()))
-// r.HandleFunc("/", http.FileServer(rice.MustFindBox("web-app").HTTPBox())).Methods("GET")
-// r.HandleFunc("/", webappFileServer).Methods("GET")
+
+
