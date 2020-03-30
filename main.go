@@ -7,14 +7,16 @@ import (
 	"log"
 	"net/http"
 	"strings"
-
+	"math"
 	// "os"
 	// "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
-
 	"github.com/BurntSushi/toml"
-	// "github.com/stianeikeland/go-rpio"
+	_ "github.com/stianeikeland/go-rpio"
+	
+	badger "github.com/dgraph-io/badger"
+	"github.com/dgraph-io/badger/v2/options"
 	
 	// "github.com/GeertJohan/go.rice"
 	
@@ -23,9 +25,14 @@ import (
 	"gobot.io/x/gobot/platforms/firmata" */
 )
 
-var config = Config{}
+var (
+	config = Config{}
+	bgdb *badger.DB
 
-// var mgcli = mgc.MGC{}
+	pins_setup_key = []byte("pins_setup")
+
+	
+)
 
 // Represents database server and credentials
 type Config struct {
@@ -120,16 +127,70 @@ func main() {
 		panic(err)
 	}
 	defer rpio.Close() */
+
+	dbOpts := badger.DefaultOptions("naas-db").
+		WithSyncWrites(false).
+		WithNumVersionsToKeep(math.MaxInt64).
+		// WithLogger(&x.ToGlog{}).
+		WithCompression(options.None).
+		WithEventLogging(false).
+		WithLogRotatesToFlush(10).
+		WithMaxCacheSize(50) // TODO(Aman): Disable cache altogether
+		
+	db, err := badger.Open(dbOpts)
+	// bgdb, err := badger.Open(badger.DefaultOptions("naas-db"))
+  if err != nil {
+	  log.Fatal(err)
+  }
+	defer bgdb.Close()
 	
+	bgdb = db
+	
+	err = bgdb.Update(func(txn *badger.Txn) error {
+	
+		// err := txn.Set([]byte("test"), []byte("test"))
+		// if err != nil {
+		// 	log.Println("err 1 ", err)
+		// 	return err
+		// }
+		// log.Println("set")
+		item, err := txn.Get(pins_setup_key)
+		if err == nil {
+			_ = item.Value(func(val []byte) error {
+			// This func with val would only be called if item.Value encounters no error.
+				
+			// Accessing val here is valid.
+			log.Println("chaged item: ", string(val))
+
+			// Copying or parsing val is valid.
+			// valCopy = append([]byte{}, val...)
+
+			// Assigning val slice to another variable is NOT OK.
+			// valNot = val // Do not do this.
+			return nil
+			})
+		} 
+		
+		return nil
+		
+	})
+	
+	if err != nil {
+		log.Println("err 3", err)
+	}
+	// clear_ctls_key()
 	r := mux.NewRouter()
 	
 	// serving api
 	apiPrefix := "/api/"
 	devicePrefix := apiPrefix + "device/"
+	controllerPrefix := apiPrefix + "controller/"
 	fieldPrefix := apiPrefix + "field/"
 	plantPrefix := apiPrefix + "plant/"
 	camPrefix := apiPrefix + "cam/"
 
+	r.HandleFunc(apiPrefix+"setup-pins", SetupPins).Methods("GET", "POST")
+	
 	/* Mapper API */
 
 	/* Device */
@@ -141,6 +202,9 @@ func main() {
 	r.HandleFunc(devicePrefix+"on/{pin}", PinOn).Methods("GET", "POST")
 	r.HandleFunc(devicePrefix+"off/{pin}", PinOff).Methods("GET", "POST")
 	
+	r.HandleFunc(controllerPrefix+"list", ControllerList).Methods("GET", "POST")
+	r.HandleFunc(controllerPrefix+"update", UpdateControllers).Methods("GET", "POST")
+
 	// implement DEVICE-ID /status /detail /get-sensor /set-control
 	r.HandleFunc(devicePrefix+"{device_id}/status", DeviceStatusHdr).Methods("GET", "POST")
 	// r.HandleFunc(devicePrefix + "{device_id}/detail", DeviceDetail).Methods("POST")
@@ -244,8 +308,6 @@ r.HandleFunc("/users", status(405, "GET", "POST")).Methods("PUT", "PATCH", "DELE
 	sv2 := gpio.NewLedDriver(pi, devices[2].Pin)
 	sv3 := gpio.NewLedDriver(pi, devices[3].Pin)
 	sv4 := gpio.NewLedDriver(pi, devices[4].Pin) */
-	
-	
 	
 	/*sv1 := rpio.Pin(devices[1].Pin)
 	sv2 := rpio.Pin(devices[2].Pin)
