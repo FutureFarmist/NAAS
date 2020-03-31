@@ -7,7 +7,8 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"math"
+	// "math"
+	// "sync"
 	// "os"
 	// "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -16,8 +17,8 @@ import (
 	_ "github.com/stianeikeland/go-rpio"
 	
 	badger "github.com/dgraph-io/badger"
-	"github.com/dgraph-io/badger/v2/options"
-	
+	// "github.com/dgraph-io/badger/v2/options"
+	cron "github.com/robfig/cron/v3"	
 	// "github.com/GeertJohan/go.rice"
 	
 	/* "gobot.io/x/gobot"
@@ -30,9 +31,14 @@ var (
 	bgdb *badger.DB
 
 	pins_setup_key = []byte("pins_setup")
-
 	
 )
+var secondParser = cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.DowOptional | cron.Descriptor)
+type Automator struct {
+	cron *cron.Cron
+	ctls map[uint16]Controller
+	devices map[string]Device
+}
 
 // Represents database server and credentials
 type Config struct {
@@ -122,23 +128,23 @@ func loggingMiddleware(next http.Handler) http.Handler {
 
 func main() {
 	infinite_wait := make(chan string)
-
+	
 	/* if err := rpio.Open(); err != nil {
 		panic(err)
 	}
 	defer rpio.Close() */
 
-	dbOpts := badger.DefaultOptions("naas-db").
-		WithSyncWrites(false).
-		WithNumVersionsToKeep(math.MaxInt64).
-		// WithLogger(&x.ToGlog{}).
-		WithCompression(options.None).
-		WithEventLogging(false).
-		WithLogRotatesToFlush(10).
-		WithMaxCacheSize(50) // TODO(Aman): Disable cache altogether
+	// dbOpts := badger.DefaultOptions("naas-db").
+	// 	WithSyncWrites(false).
+	// 	WithNumVersionsToKeep(math.MaxInt64).
+	// 	// WithLogger(&x.ToGlog{}).
+	// 	WithCompression(options.None).
+	// 	WithEventLogging(false).
+	// 	WithLogRotatesToFlush(10).
+	// 	WithMaxCacheSize(50) // TODO(Aman): Disable cache altogether
 		
-	db, err := badger.Open(dbOpts)
-	// bgdb, err := badger.Open(badger.DefaultOptions("naas-db"))
+	// db, err := badger.Open(dbOpts)
+	db, err := badger.Open(badger.DefaultOptions("naas-db"))
   if err != nil {
 	  log.Fatal(err)
   }
@@ -178,6 +184,24 @@ func main() {
 	if err != nil {
 		log.Println("err 3", err)
 	}
+	
+	auto := Automator { 
+		cron: cron.New(cron.WithParser(secondParser), cron.WithChain()),
+		ctls: make(map[uint16]Controller), 
+		devices: make(map[string]Device), 
+	}
+	// cron := cron.New(WithParser(secondParser), WithChain())
+	println("new cron")
+	
+	auto.cron.Start()
+	defer auto.cron.Stop()
+	
+	println("run run_controllers everyday midnight")
+	auto.cron.AddFunc("0 0 0 * * *", func() { auto.run_controllers()})
+	
+	auto.run_controllers()
+	
+	
 	// clear_ctls_key()
 	r := mux.NewRouter()
 	
@@ -199,8 +223,8 @@ func main() {
 	r.HandleFunc(fieldPrefix+"list", FieldList).Methods("GET", "POST")
 	r.HandleFunc(plantPrefix+"list", PlantList).Methods("GET", "POST")
 
-	r.HandleFunc(devicePrefix+"on/{pin}", PinOn).Methods("GET", "POST")
-	r.HandleFunc(devicePrefix+"off/{pin}", PinOff).Methods("GET", "POST")
+	r.HandleFunc(devicePrefix+"on/{pin}", GPIO_on).Methods("GET", "POST")
+	r.HandleFunc(devicePrefix+"off/{pin}", GPIO_off).Methods("GET", "POST")
 	
 	r.HandleFunc(controllerPrefix+"list", ControllerList).Methods("GET", "POST")
 	r.HandleFunc(controllerPrefix+"update", UpdateControllers).Methods("GET", "POST")

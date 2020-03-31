@@ -17,13 +17,15 @@ import (
 
 type Device struct {
 		
-		Id string `bson:"DeviceId" json:"DeviceId"`
+		Id string `bson:"Id" json:"Id"`
 		Name string `bson:"Name,omitempty" json:"Name,omitempty"`
 		DeviceId string `bson:"DeviceId,omitempty" json:"DeviceId,omitempty"`
 		Desc string `bson:"Desc,omitempty" json:"Desc,omitempty"`
 
 		/* Associated pin */
 		Pin	uint8 `bson:"Pin,omitempty" json:"Pin,omitempty"`
+		
+		GPIO uint8 `bson:"GPIO,omitempty" json:"GPIO,omitempty"`
 		
 		// ENUM ACTIVE, INACTIVE, ERROR
 		Status uint8 `bson:"Status,omitempty" json:"Status,omitempty"`
@@ -148,11 +150,11 @@ func DeviceStatusHdr(w http.ResponseWriter, r *http.Request) {
 	respondWithJson(w, http.StatusCreated, "DeviceStatus"+deviceId)
 }
 
-func PinOn(w http.ResponseWriter, r *http.Request) {
+func GPIO_on(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	vars := mux.Vars(r)
-	pin := vars["pin"]
+	pin := vars["GPIO"]
 	
 	pinNum, err := strconv.Atoi(pin)
 	if err != nil {
@@ -162,16 +164,16 @@ func PinOn(w http.ResponseWriter, r *http.Request) {
 	pinHdl.Output()
 	pinHdl.High()
 	
-	log.Println("PinOn", pin)
+	log.Println("GPIO_on", pin)
 	
 	respondWithJson(w, http.StatusCreated, "{status: 'ok'}")
 }
 
-func PinOff(w http.ResponseWriter, r *http.Request) {
+func GPIO_off(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	
 	vars := mux.Vars(r)
-	pin := vars["pin"]
+	pin := vars["GPIO"]
 	
 	pinNum, err := strconv.Atoi(pin)
 	if err != nil {
@@ -182,7 +184,7 @@ func PinOff(w http.ResponseWriter, r *http.Request) {
 	pinHdl.Output()
 	pinHdl.Low()
 	
-	log.Println("PinOff", pin)
+	log.Println("GPIO_off", pin)
 
 	respondWithJson(w, http.StatusCreated, "{status: 'ok'}")
 }
