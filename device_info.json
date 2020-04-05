@@ -1,0 +1,43 @@
+[
+  {
+    "DeviceId": "relay-pin",
+    "Name": "Relay Pin",
+    "PinMode": 1,
+    "PinType": 0,
+    "ControlScheme": 0,
+    "Factors": ""
+  },
+  {
+    "DeviceId": "dht11",
+    "Name": "DHT11 - Humidity, Temperature",
+    "PinMode": 0,
+    "PinType": 0,
+    "ControlScheme": 0,
+    "Factors": "3,4"
+  },
+  {
+    "DeviceId": "dht22",
+    "Name": "DHT22 - Humidity, Temperature",
+    "PinMode": 0,
+    "PinType": 0,
+    "ControlScheme": 0,
+    "Factors": "3,4"
+  },
+  {
+    "DeviceId": "am2302",
+    "Name": "AM2302 - Humidity, Temperature",
+    "PinMode": 0,
+    "PinType": 0,
+    "ControlScheme": 0,
+    "Factors": "3,4"
+  },
+  {
+    "DeviceId": "sms-lm393",
+    "Name": "Soil Moisture Sensor - via LM393",
+    "PinMode": 0,
+    "PinType": 0,
+    "ControlScheme": 1,
+    "Factors": "1"
+  }
+  
+]

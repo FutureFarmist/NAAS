@@ -6,7 +6,11 @@ require (
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/BurntSushi/toml v0.3.1
 	github.com/GeertJohan/go.rice v1.0.0
+	github.com/MichaelS11/go-dht v0.0.0-20181004212404-be44b9ee7fec
 	github.com/creack/goselect v0.1.1 // indirect
+	github.com/d2r2/go-dht v0.0.0-20200119175940-4ba96621a218
+	github.com/d2r2/go-logger v0.0.0-20181221090742-9998a510495e // indirect
+	github.com/d2r2/go-shell v0.0.0-20191113051817-7664ea33645f // indirect
 	github.com/dgraph-io/badger v1.6.0
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
@@ -34,6 +38,7 @@ require (
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/yaml.v2 v2.2.8 // indirect
+	periph.io/x/extra v0.0.0-20200225150845-c5a4b83ade91 // indirect
 )
 
 replace github.com/dgraph-io/badger => ../badger

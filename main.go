@@ -7,6 +7,9 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"errors"
+	// "os/exec"
+
 	// "math"
 	// "sync"
 	// "os"
@@ -14,30 +17,100 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
 	"github.com/BurntSushi/toml"
-	_ "github.com/stianeikeland/go-rpio"
+
+	// "github.com/stianeikeland/go-rpio"
 	
 	badger "github.com/dgraph-io/badger"
 	// "github.com/dgraph-io/badger/v2/options"
-	cron "github.com/robfig/cron/v3"	
+	cron "github.com/robfig/cron/v3"
 	// "github.com/GeertJohan/go.rice"
 	
-	/* "gobot.io/x/gobot"
-	"gobot.io/x/gobot/drivers/gpio"
-	"gobot.io/x/gobot/platforms/firmata" */
+	// "github.com/kidoman/embd"
+	// _ "github.com/kidoman/embd/host/all"
+	
+	// "gobot.io/x/gobot"
+	// "gobot.io/x/gobot/drivers/spi"
+	
+	// "gobot.io/x/gobot/drivers/gpio"
+	// "gobot.io/x/gobot/platforms/firmata"
+	
+	// "github.com/d2r2/go-dht"
+	// "github.com/MichaelS11/go-dht"
+	
+	// "periph.io/x/periph/host"
+	// "periph.io/x/periph/conn/gpio"
+	// "periph.io/x/periph/conn/gpio/gpioreg"
+	// "periph.io/x/periph/host/rpi"
 )
 
 var (
 	config = Config{}
 	bgdb *badger.DB
+	automator *Automator
 
-	pins_setup_key = []byte("pins_setup")
+	DEVICE_KEY = []byte("pins_setup")
+	CTLS_KEY = []byte("ctls")
 	
+	// CTL_KEY = []byte("ctl")
+	// ctl1, ctl2, ctl3, ...
+	// CTLS_COUNT_KEY = []byte("ctls_count")
+	// ctls_update_DATE
+	// CTLS_UPDATE_KEY = []byte("ctls_update")
+
+	// every update controllers would give it controller 
+	// ctls_ID
+	// active_controllers_id_key = []byte("active_controllers_id")
+
 )
 var secondParser = cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.DowOptional | cron.Descriptor)
 type Automator struct {
 	cron *cron.Cron
 	ctls map[uint16]Controller
 	devices map[string]Device
+	ctl_entry_map map[uint16]cron.EntryID
+
+	// sensor_values[DEVICE_ID][FACTOR]string
+	sensor_values []SensorValue
+
+	device_info map[string]DeviceInfo
+}
+
+func (auto *Automator) setup_cron() error {
+	
+	println("setup_cron")
+	auto.cron = cron.New(cron.WithParser(secondParser), cron.WithChain())
+	if auto.cron != nil {
+		return nil	
+	}
+	auto.cron.Start()
+	defer auto.cron.Stop()
+
+	println("run run_controllers everyday midnight")
+	auto.cron.AddFunc("0 0 0 * * *", func() { auto.run_controllers()})
+	
+	auto.run_controllers()
+	
+	auto.cron = cron.New(cron.WithSeconds())
+	if auto.cron != nil {
+		return nil	
+	}
+	return errors.New("new cron fail")
+}
+
+type DeviceInfo struct {
+	DeviceId 	string 	`bson:"DeviceId,omitempty" json:"DeviceId,omitempty"`
+	Name 			string 	`bson:"Name,omitempty" json:"Name,omitempty"`
+	PinMode 	uint8 	`bson:"PinMode,omitempty" json:"PinMode,omitempty"`
+	PinType 	uint8 	`bson:"PinType,omitempty" json:"PinType,omitempty"`
+	ControlScheme uint8 `bson:"ControlScheme,omitempty" json:"ControlScheme,omitempty"`
+	Factors 	string `bson:"Factors,omitempty" json:"Factors,omitempty"`
+}
+
+type SensorValue struct {
+	Device_id string `bson:"Device_id,omitempty" json:"Device_id,omitempty"`
+	Factor	uint8 `bson:"Factor,omitempty" json:"Factor,omitempty"`
+	Value	string `bson:"Value,omitempty" json:"Value,omitempty"`
+	Is_boolean string `bson:"Is_boolean,omitempty" json:"Is_boolean,omitempty"`
 }
 
 // Represents database server and credentials
@@ -75,13 +148,6 @@ func (c *Config) Read() {
 	}
 }
 
-/* func init() {
-	config.Read()
-	mgcli.Server = config.Server
-	mgcli.Database = config.Database
-	mgcli.Connect()
-} */
-
 /* Responding */
 
 func respondWithError(w http.ResponseWriter, code int, msg string) {
@@ -89,7 +155,12 @@ func respondWithError(w http.ResponseWriter, code int, msg string) {
 }
 
 func respondWithJson(w http.ResponseWriter, code int, payload interface{}) {
-	response, _ := json.Marshal(payload)
+	response, err := json.Marshal(payload)
+	if err != nil {
+		log.Println("marshalling respondWithJson Error")
+		log.Println(err)
+	}
+	log.Println(payload)
 	//Allow CORS here By * or specific origin
 	// w.Header().Set("Access-Control-Allow-Origin", "*")
 	// w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
@@ -102,6 +173,16 @@ func respondWithHTML(w http.ResponseWriter, code int, payload []byte) {
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(code)
 	w.Write(payload)
+}
+
+func get_device_info() ([]byte, error) {
+
+	// get device_info from device-list.json
+	device_info_json, err := ioutil.ReadFile("device_info.json")
+	if err != nil {
+		return nil, errors.New("error reading device_info.json")
+	}
+	return device_info_json, nil
 }
 
 func serveWebApp(w http.ResponseWriter, r *http.Request) {
@@ -128,11 +209,10 @@ func loggingMiddleware(next http.Handler) http.Handler {
 
 func main() {
 	infinite_wait := make(chan string)
-	
-	/* if err := rpio.Open(); err != nil {
-		panic(err)
-	}
-	defer rpio.Close() */
+	// if err := rpio.Open(); err != nil {
+	// 	panic(err)
+	// }
+	// defer rpio.Close()
 
 	// dbOpts := badger.DefaultOptions("naas-db").
 	// 	WithSyncWrites(false).
@@ -151,7 +231,8 @@ func main() {
 	defer bgdb.Close()
 	
 	bgdb = db
-	
+	// clear_clts()
+	// clear_devices()
 	err = bgdb.Update(func(txn *badger.Txn) error {
 	
 		// err := txn.Set([]byte("test"), []byte("test"))
@@ -160,7 +241,7 @@ func main() {
 		// 	return err
 		// }
 		// log.Println("set")
-		item, err := txn.Get(pins_setup_key)
+		item, err := txn.Get(DEVICE_KEY)
 		if err == nil {
 			_ = item.Value(func(val []byte) error {
 			// This func with val would only be called if item.Value encounters no error.
@@ -186,48 +267,66 @@ func main() {
 	}
 	
 	auto := Automator { 
-		cron: cron.New(cron.WithParser(secondParser), cron.WithChain()),
+		// cron: cron.New(cron.WithParser(secondParser), cron.WithChain()),
+		cron: cron.New(cron.WithSeconds()),
 		ctls: make(map[uint16]Controller), 
 		devices: make(map[string]Device), 
+		ctl_entry_map: make(map[uint16]cron.EntryID), 
+		sensor_values: []SensorValue{},
+		device_info: make(map[string]DeviceInfo),
 	}
+
+	automator = &auto
+	device_info_json, err := get_device_info()
+	var device_info []DeviceInfo = []DeviceInfo{}
+	err = json.Unmarshal(device_info_json, &device_info)
+	if err != nil {
+		log.Println(err)
+	}
+
+	for _, di := range device_info {
+		auto.device_info[di.DeviceId] = di
+	}
+	
 	// cron := cron.New(WithParser(secondParser), WithChain())
 	println("new cron")
 	
-	auto.cron.Start()
-	defer auto.cron.Stop()
-	
-	println("run run_controllers everyday midnight")
-	auto.cron.AddFunc("0 0 0 * * *", func() { auto.run_controllers()})
-	
-	auto.run_controllers()
+	auto.setup_cron()
 	
 	
-	// clear_ctls_key()
+	// mocking device_value
+	auto.sensor_values = append([]SensorValue{}, SensorValue{ Device_id: "3", Factor: 2, Value: "3.3", Is_boolean: "false"})
+	/* auto.sensor_values["dv2"] = append(
+		auto.sensor_values["dv2"], 
+		SensorValue{ factor: 2, value: 5.3}) */
+	
 	r := mux.NewRouter()
 	
 	// serving api
 	apiPrefix := "/api/"
 	devicePrefix := apiPrefix + "device/"
 	controllerPrefix := apiPrefix + "controller/"
-	fieldPrefix := apiPrefix + "field/"
-	plantPrefix := apiPrefix + "plant/"
-	camPrefix := apiPrefix + "cam/"
+	// fieldPrefix_ := apiPrefix + "field/"
+	// plantPrefix := apiPrefix + "plant/"
+	// camPrefix := apiPrefix + "cam/"
 
-	r.HandleFunc(apiPrefix+"setup-pins", SetupPins).Methods("GET", "POST")
+	r.HandleFunc(apiPrefix+"setup-pins", SetupPins).Methods("POST")
 	
 	/* Mapper API */
 
 	/* Device */
-	r.HandleFunc(devicePrefix+"list", DeviceList).Methods("GET", "POST")
-	r.HandleFunc(camPrefix+"list", CamList).Methods("GET", "POST")
-	r.HandleFunc(fieldPrefix+"list", FieldList).Methods("GET", "POST")
-	r.HandleFunc(plantPrefix+"list", PlantList).Methods("GET", "POST")
+	r.HandleFunc(devicePrefix+"list", Device_List).Methods("GET", "POST")
+	// r.HandleFunc(camPrefix+"list", CamList).Methods("GET", "POST")
+	// r.HandleFunc(fieldPrefix+"list", FieldList).Methods("GET", "POST")
+	// r.HandleFunc(plantPrefix+"list", PlantList).Methods("GET", "POST")
+	r.HandleFunc(devicePrefix+"device-info", GetDeviceInfo).Methods("GET", "POST")
+	r.HandleFunc(devicePrefix+"device-value", auto.DeviceValues).Methods("GET", "POST")
 
 	r.HandleFunc(devicePrefix+"on/{pin}", GPIO_on).Methods("GET", "POST")
 	r.HandleFunc(devicePrefix+"off/{pin}", GPIO_off).Methods("GET", "POST")
 	
 	r.HandleFunc(controllerPrefix+"list", ControllerList).Methods("GET", "POST")
-	r.HandleFunc(controllerPrefix+"update", UpdateControllers).Methods("GET", "POST")
+	r.HandleFunc(controllerPrefix+"update", auto.UpdateControllers).Methods("POST")
 
 	// implement DEVICE-ID /status /detail /get-sensor /set-control
 	r.HandleFunc(devicePrefix+"{device_id}/status", DeviceStatusHdr).Methods("GET", "POST")
@@ -236,24 +335,23 @@ func main() {
 	// r.HandleFunc(devicePrefix + "{device_id}/set-control", DeviceSetControl).Methods("POSt")
 
 	// // implement by-factor
-	r.HandleFunc(devicePrefix+"by-factor/air-temperature", DeviceFactorAirTemp).Methods("GET", "POST")
+	// r.HandleFunc(devicePrefix+"by-factor/air-temperature", DeviceFactorAirTemp).Methods("GET", "POST")
 	// r.HandleFunc(devicePrefix + "by-factor/air-humidity", DeviceFactorAirHumi).Methods("POST")
 	// r.HandleFunc(devicePrefix + "by-factor/soil-humidity", DeviceFactorSoilHumi).Methods("POST")
 	// r.HandleFunc(devicePrefix + "by-factor/light-intensity", DeviceFactorLightInten).Methods("POST")
 
 	// implementing CAMERA-ID + /picture /info /status
-	r.HandleFunc(apiPrefix+camPrefix+"/camId", CamList).Methods("GET", "POST")
+	// r.HandleFunc(apiPrefix+camPrefix+"/camId", CamList).Methods("GET", "POST")
 	// r.HandleFunc(apiPrefix + "desk/v1/delete", DeleteDesk).Methods("POST")
 
-	/* Automator API */
 
 	// implementing FIELD-ID /plant-list /device-list
-	r.HandleFunc(fieldPrefix+"{field_id}", FieldData).Methods("GET", "POST")
+	// r.HandleFunc(fieldPrefix+"{field_id}", FieldData).Methods("GET", "POST")
 	// r.HandleFunc(fieldPrefix + "{field_id}/plant-list", FieldPlantList).Methods("POST")
 	// r.HandleFunc(fieldPrefix + "{field_id}/device-list", FieldDeviceList).Methods("POST")
 
 	// implementing PLANT-ID /device-list
-	r.HandleFunc(plantPrefix+"{plant_id}", PlantData).Methods("GET", "POST")
+	// r.HandleFunc(plantPrefix+"{plant_id}", PlantData).Methods("GET", "POST")
 	// r.HandleFunc(plantPrefix + "{plant_id}/device-list", PlantDeviceList).Methods("POST")
 	
 	
@@ -282,20 +380,50 @@ func main() {
 		AllowedHeaders:     []string{"Content-Type", "Bearer", "Bearer ", "content-type", "Origin", "Accept"},
 		OptionsPassthrough: false,
 	})	
-	go http.ListenAndServe(":80", cwa.Handler(webapp))
+	go http.ListenAndServe(":8080", cwa.Handler(webapp))
 	
 	log.Println("Serving NAAS Web Application + API")
 	
+
+	/* temperature, humidity, retried, err :=
+		dht.ReadDHTxxWithRetry(dht.DHT11, 37, false, 10)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// Print temperature and humidity
+	fmt.Printf("Temperature = %v*C, Humidity = %v%% (retried %d times)\n",
+		temperature, humidity, retried) */
+		
+		
+	/* err = dht.HostInit()
+	if err != nil {
+		fmt.Println("HostInit error:", err)
+	}
+
+	dht, err := dht.NewDHT(rpi.P1_7, dht.Fahrenheit, "dht11")
+	if err != nil {
+		fmt.Println("NewDHT error:", err)
+	}
+
+	humidity, temperature, err := dht.ReadRetry(11)
+	if err != nil {
+		fmt.Println("Read error:", err)
+	}
+
+	fmt.Printf("humidity: %v\n", humidity)
+	fmt.Printf("temperature: %v\n", temperature) */
+	
+	
+		
 	<-infinite_wait
 	
 }
+
 
 /* // return 405 for PUT, PATCH and DELETE
 r.HandleFunc("/users", status(405, "GET", "POST")).Methods("PUT", "PATCH", "DELETE")
 */
 /* Serving Web App Folder */
-
-
 
 	// pi := raspi.NewAdaptor()
 	
