@@ -297,9 +297,10 @@ func main() {
 	
 	auto.setup_cron()
 	
-	
 	// mocking device_value
-	auto.sensor_values = append([]SensorValue{}, SensorValue{ Device_id: "3", Factor: 2, Value: "3.3", Is_boolean: "false"})
+	auto.sensor_values = append([]SensorValue{}, SensorValue{ Device_id: "7", Factor: 3, Value: "59.3", Is_boolean: "false"})
+	auto.sensor_values = append(auto.sensor_values, SensorValue{ Device_id: "7", Factor: 4, Value: "37.7", Is_boolean: "false"})
+	auto.sensor_values = append(auto.sensor_values, SensorValue{ Device_id: "40", Factor: 1, Value: "78.9", Is_boolean: "false"})
 	/* auto.sensor_values["dv2"] = append(
 		auto.sensor_values["dv2"], 
 		SensorValue{ factor: 2, value: 5.3}) */
@@ -323,8 +324,8 @@ func main() {
 	// r.HandleFunc(camPrefix+"list", CamList).Methods("GET", "POST")
 	// r.HandleFunc(fieldPrefix+"list", FieldList).Methods("GET", "POST")
 	// r.HandleFunc(plantPrefix+"list", PlantList).Methods("GET", "POST")
-	r.HandleFunc(devicePrefix+"device-info", GetDeviceInfo).Methods("GET", "POST")
-	r.HandleFunc(devicePrefix+"device-value", auto.DeviceValues).Methods("GET", "POST")
+	r.HandleFunc(devicePrefix+"info", GetDeviceInfo).Methods("GET", "POST")
+	r.HandleFunc(devicePrefix+"values", auto.DeviceValues).Methods("GET", "POST")
 
 	r.HandleFunc(devicePrefix+"on/{pin}", GPIO_on).Methods("GET", "POST")
 	r.HandleFunc(devicePrefix+"off/{pin}", GPIO_off).Methods("GET", "POST")
