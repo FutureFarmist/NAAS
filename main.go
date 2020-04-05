@@ -18,7 +18,7 @@ import (
 	"github.com/rs/cors"
 	"github.com/BurntSushi/toml"
 
-	// "github.com/stianeikeland/go-rpio"
+	"github.com/stianeikeland/go-rpio"
 	
 	badger "github.com/dgraph-io/badger"
 	// "github.com/dgraph-io/badger/v2/options"
@@ -209,10 +209,10 @@ func loggingMiddleware(next http.Handler) http.Handler {
 
 func main() {
 	infinite_wait := make(chan string)
-	// if err := rpio.Open(); err != nil {
-	// 	panic(err)
-	// }
-	// defer rpio.Close()
+	if err := rpio.Open(); err != nil {
+		panic(err)
+	}
+	defer rpio.Close()
 
 	// dbOpts := badger.DefaultOptions("naas-db").
 	// 	WithSyncWrites(false).
@@ -231,8 +231,12 @@ func main() {
 	defer bgdb.Close()
 	
 	bgdb = db
+
+	// TODO: become utility functions on NAAS and Seed
+	// on-demand commands
 	// clear_clts()
 	// clear_devices()
+
 	err = bgdb.Update(func(txn *badger.Txn) error {
 	
 		// err := txn.Set([]byte("test"), []byte("test"))
