@@ -297,13 +297,11 @@ func main() {
 	
 	auto.setup_cron()
 	
-	// mocking device_value
-	auto.sensor_values = append([]SensorValue{}, SensorValue{ Device_id: "7", Factor: 3, Value: "59.3", Is_boolean: "false"})
-	auto.sensor_values = append(auto.sensor_values, SensorValue{ Device_id: "7", Factor: 4, Value: "37.7", Is_boolean: "false"})
-	auto.sensor_values = append(auto.sensor_values, SensorValue{ Device_id: "40", Factor: 1, Value: "78.9", Is_boolean: "false"})
-	/* auto.sensor_values["dv2"] = append(
-		auto.sensor_values["dv2"], 
-		SensorValue{ factor: 2, value: 5.3}) */
+	// mocking sensor_values
+	// auto.sensor_values = append([]SensorValue{}, SensorValue{ Device_id: "7", Factor: 3, Value: "59.3", Is_boolean: "false"})
+	// auto.sensor_values = append(auto.sensor_values, SensorValue{ Device_id: "7", Factor: 4, Value: "37.7", Is_boolean: "false"})
+	// auto.sensor_values = append(auto.sensor_values, SensorValue{ Device_id: "40", Factor: 1, Value: "78.9", Is_boolean: "false"})
+	
 	
 	r := mux.NewRouter()
 	
