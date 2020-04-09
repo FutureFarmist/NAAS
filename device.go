@@ -155,54 +155,112 @@ func SetupPins(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	err = bgdb.Update(func(txn *badger.Txn) error {
-		
 		if err := txn.Set(DEVICE_KEY, body); err != nil {
-			respondWithJson(w, http.StatusCreated, "{status: 'setting fail'}")
-			return nil
+			return err
 		}
 		log.Println("pins setup successful")
 		
-		item, err := txn.Get(DEVICE_KEY)
-		if err == nil {
-			_ = item.Value(func(val []byte) error {
-			// This func with val would only be called if item.Value encounters no error.
+		// item, err := txn.Get(DEVICE_KEY)
+		// if err == nil {
+		// 	err = item.Value(func(val []byte) error {
+		// 	// This func with val would only be called if item.Value encounters no error.
 				
-			// Accessing val here is valid.
-			log.Println("chaged item: ", string(val))
-
-			// automator.run_controllers()
+		// 	// Accessing val here is valid.
+		// 	// log.Println("chaged item: ", string(val))
 			
-			// Copying or parsing val is valid.
-			// valCopy = append([]byte{}, val...)
+		// 	// Copying or parsing val is valid.
+		// 	// valCopy = append([]byte{}, val...)
 
-			// Assigning val slice to another variable is NOT OK.
-			// valNot = val // Do not do this.
-			return nil
-			})
-		} 
+		// 	// Assigning val slice to another variable is NOT OK.
+		// 	// valNot = val // Do not do this.
+		// 	return nil
+		// 	})
+		// 	return err
+		// } else {
+		// 	return err
+		// }
 	
 		return nil
 	})
+	
+	if err != nil {
+		respondWithJson(w, http.StatusCreated, "{status: 'setting fail'}")
+	} else {
+		GetDevices()
+		automator.cron.Stop()
+		automator.setup_cron()
+		respondWithJson(w, http.StatusCreated, "{success: true}")
+	}
 }
 
+func GetDevices() error {
+	log.Println("GetDevices")
+	err := bgdb.View(func(txn *badger.Txn) error {
+		var dvs_json []byte
+		// Getting devices into auto.devices
+		item, err := txn.Get(DEVICE_KEY)
+		if err != nil {
+			log.Println("error getting DEVICE_KEY")
+			return nil
+		}
+		
+		err = item.Value(func(val []byte) error {
+			log.Println("successful getting DEVICE_KEY")
+			dvs_json = append([]byte{}, val...)
+			return nil
+		})
+		
+		if err != nil {
+			log.Println("no value on DEVICE_KEY")
+			return nil
+		}
+		
+		// log.Println(string(dvs_json))
+		var devices []Device
+		err = json.Unmarshal(dvs_json, &devices)
+		if err != nil {
+			log.Println(err)
+			return nil
+		}
+		
+		log.Println("devices: ", devices)
+		
+		if len(devices) > 0 {
+			for _, device := range devices {
+				if len(device.Id) > 0 {
+					automator.devices[device.Id] = device;
+					fmt.Printf("device: %s \n", device.Id)
+				}
+			}
+		}
+		
+		// log.Println("devices: ", automator.devices)
+		return nil
+	})
+	return err
+}
+
+// not implemented yet
 func CamList(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	log.Println("CamListt")
-
+	
 	respondWithJson(w, http.StatusCreated, "CamListt")
 }
 
 // Factor Family
 
+// not implemented yet
 func DeviceFactorAirTemp(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	log.Println("DeviceFactorAirTemp")
-
+	
 	respondWithJson(w, http.StatusCreated, "DeviceFactorAirTemp")
 }
 
 // Device Family
 
+// not implemented yet
 func DeviceStatusHdr(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
@@ -224,7 +282,7 @@ func GPIO_on(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println(err, pin)
 	}
-	gpio, err := getGPIO(uint8(pinNum))
+	gpio, err := GetGPIO(uint8(pinNum))
 	if err != nil {
 		log.Println(err, pin)
 		return	
@@ -247,7 +305,7 @@ func GPIO_off(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println(err, pin)
 	}
-	gpio, err := getGPIO(uint8(pinNum))
+	gpio, err := GetGPIO(uint8(pinNum))
 	if err != nil {
 		log.Println(err, pin)
 		return	
@@ -261,7 +319,7 @@ func GPIO_off(w http.ResponseWriter, r *http.Request) {
 	respondWithJson(w, http.StatusCreated, "{status: 'ok'}")
 }
 
-func getGPIO(pin uint8) (uint8, error) {
+func GetGPIO(pin uint8) (uint8, error) {
 	for _, device := range automator.devices {
 		if device.Pin == pin {
 			return device.GPIO, nil
@@ -271,10 +329,9 @@ func getGPIO(pin uint8) (uint8, error) {
 }
 
 func (device *Device) read_sensor(auto *Automator) error {
-	log.Println("read_sensor")
+	log.Println("Read sensor")
 	if len(device.DeviceId) > 0 {
-		log.Println("ID")
-		log.Println(device.GPIO)
+		log.Println("PIN", device.Pin, ", GPIO ", device.GPIO)
 		// FT_SOIL_HUMIDITY
 		// FT_SOIL_TEMPERATURE
 		// FT_AIR_HUMIDITY
@@ -299,9 +356,10 @@ func (device *Device) read_sensor(auto *Automator) error {
 			}
 			
 		} else if device.GPIO >= 0 && device.DeviceId == "sms-lm393" {
-			moisture_high, err := read_sms_lm393(strconv.Itoa(int(device.GPIO)))
+			log.Println("Reading mosture sensor")
+			moisture_high, err := read_sms_lm393(device.GPIO)
 			if err != nil {
-				log.Println("reading mosture_high fail ", err)
+				log.Println("reading mosture sensor fail ", err)
 				return nil
 			}
 			auto.update_sensor_values(device.Id, FT_SOIL_HUMIDITY, moisture_high, true)	
@@ -326,7 +384,7 @@ func (auto *Automator) update_sensor_values(device_id string, ifactor Factor, iv
 			auto.sensor_values[key].Value = ivalue
 			auto.sensor_values[key].Is_boolean = is_bool_text
 			// sv.Is_boolean = "true"
-			log.Println("update exist ", ivalue)
+			log.Println("update exist value: ", ivalue, " (Boolean="+is_bool_text+")")
 			updated = true
 		} 
 	}
@@ -380,29 +438,29 @@ func read_from_dht(gpio string, dht string) (string, string, error){
 	return humi, temp, nil
 }
 
-func read_sms_lm393(pin string) (string, error) {
+func read_sms_lm393(gpio uint8) (string, error) {
 	log.Println("read_sms_lm393")
-	pinNum, err := strconv.Atoi(pin)
-	if err == nil {
-		gpio, err := getGPIO(uint8(pinNum))
-		if err == nil {
-			log.Println("read_sms_lm393: ", gpio)
-			pinHdl := rpio.Pin(gpio)
-			pinHdl.Input()
-			res := pinHdl.Read() 
-			log.Println("res: ", res)
-			if uint8(res) == 0 {
-				return "false", nil
-			} else if uint8(res) == 1 {
-				return "true", nil
-			}
-		}
+	// pinNum, err := strconv.Atoi(pin)
+	// if err == nil {
+		// gpio, err := GetGPIO(uint8(pinNum))
+		// if err == nil {
+	log.Println("read_sms_lm393: ", gpio)
+	pinHdl := rpio.Pin(gpio)
+	pinHdl.Input()
+	res := pinHdl.Read() 
+	log.Println("res: ", res)
+	if uint8(res) == 0 {
+		return "false", nil
+	} else if uint8(res) == 1 {
+		return "true", nil
 	}
-	log.Println(err, pin)
+		// }
+	// }
+	// log.Println(err, pin)
 	return "", errors.New("cannot read from sms_lm393")
 }
 
-
+// utility func
 func clear_ctls() {
 	
 	bgdb.Update(func(txn *badger.Txn) error {
@@ -421,6 +479,7 @@ func clear_ctls() {
 	})
 }
 
+// utility func
 func clear_devices() {
 	
 	bgdb.Update(func(txn *badger.Txn) error {

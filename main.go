@@ -16,7 +16,7 @@ import (
 	// "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
-	"github.com/BurntSushi/toml"
+	// "github.com/BurntSushi/toml"
 
 	"github.com/stianeikeland/go-rpio"
 	
@@ -45,6 +45,7 @@ import (
 
 var (
 	config = Config{}
+	
 	bgdb *badger.DB
 	automator *Automator
 
@@ -62,39 +63,39 @@ var (
 	// active_controllers_id_key = []byte("active_controllers_id")
 
 )
-var secondParser = cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.DowOptional | cron.Descriptor)
+
 type Automator struct {
 	cron *cron.Cron
 	ctls map[uint16]Controller
 	devices map[string]Device
 	ctl_entry_map map[uint16]cron.EntryID
-
+	
 	// sensor_values[DEVICE_ID][FACTOR]string
 	sensor_values []SensorValue
-
+	
 	device_info map[string]DeviceInfo
 }
 
-func (auto *Automator) setup_cron() error {
+var secondParser = cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.DowOptional | cron.Descriptor)
+
+func (auto Automator) setup_cron() error {
 	
-	println("setup_cron")
-	auto.cron = cron.New(cron.WithParser(secondParser), cron.WithChain())
-	if auto.cron != nil {
-		return nil	
+	println("Setting up cron")
+	// auto.cron = cron.New(cron.WithParser(secondParser), cron.WithChain())
+	auto.cron = cron.New(cron.WithSeconds())
+	if auto.cron == nil {
+		return nil
 	}
 	auto.cron.Start()
-	defer auto.cron.Stop()
+	// this is the problem. defer run this at the end of this function
+	// defer auto.cron.Stop()
 
-	println("run run_controllers everyday midnight")
-	auto.cron.AddFunc("0 0 0 * * *", func() { auto.run_controllers()})
+	println("Resetting controllers everyday midnight")
+	auto.cron.AddFunc("0 0 0 * * *", func() { auto.setup_cron() })
 	
 	auto.run_controllers()
 	
-	auto.cron = cron.New(cron.WithSeconds())
-	if auto.cron != nil {
-		return nil	
-	}
-	return errors.New("new cron fail")
+	return nil
 }
 
 type DeviceInfo struct {
@@ -139,13 +140,6 @@ func (fs FileSystem) Open(path string) (http.File, error) {
 	}
 
 	return f, nil
-}
-
-// Read and parse the configuration file
-func (c *Config) Read() {
-	if _, err := toml.DecodeFile("config.toml", &c); err != nil {
-		log.Fatal(err)
-	}
 }
 
 /* Responding */
@@ -224,11 +218,12 @@ func main() {
 	// 	WithMaxCacheSize(50) // TODO(Aman): Disable cache altogether
 		
 	// db, err := badger.Open(dbOpts)
+	// db, err := badger.Open(badger.DefaultOptions("naas-db"))
 	db, err := badger.Open(badger.DefaultOptions("naas-db"))
   if err != nil {
 	  log.Fatal(err)
   }
-	defer bgdb.Close()
+	defer db.Close()
 	
 	bgdb = db
 
@@ -237,38 +232,38 @@ func main() {
 	// clear_clts()
 	// clear_devices()
 
-	err = bgdb.Update(func(txn *badger.Txn) error {
+	// err = bgdb.Update(func(txn *badger.Txn) error {
 	
-		// err := txn.Set([]byte("test"), []byte("test"))
-		// if err != nil {
-		// 	log.Println("err 1 ", err)
-		// 	return err
-		// }
-		// log.Println("set")
-		item, err := txn.Get(DEVICE_KEY)
-		if err == nil {
-			_ = item.Value(func(val []byte) error {
-			// This func with val would only be called if item.Value encounters no error.
+	// 	// err := txn.Set([]byte("test"), []byte("test"))
+	// 	// if err != nil {
+	// 	// 	log.Println("err 1 ", err)
+	// 	// 	return err
+	// 	// }
+	// 	// log.Println("set")
+	// 	item, err := txn.Get(DEVICE_KEY)
+	// 	if err == nil {
+	// 		_ = item.Value(func(val []byte) error {
+	// 		// This func with val would only be called if item.Value encounters no error.
 				
-			// Accessing val here is valid.
-			log.Println("chaged item: ", string(val))
+	// 		// Accessing val here is valid.
+	// 		log.Println("chaged item: ", string(val))
 
-			// Copying or parsing val is valid.
-			// valCopy = append([]byte{}, val...)
+	// 		// Copying or parsing val is valid.
+	// 		// valCopy = append([]byte{}, val...)
 
-			// Assigning val slice to another variable is NOT OK.
-			// valNot = val // Do not do this.
-			return nil
-			})
-		} 
+	// 		// Assigning val slice to another variable is NOT OK.
+	// 		// valNot = val // Do not do this.
+	// 		return nil
+	// 		})
+	// 	} 
 		
-		return nil
+	// 	return nil
 		
-	})
+	// })
 	
-	if err != nil {
-		log.Println("err 3", err)
-	}
+	// if err != nil {
+	// 	log.Println("err 3", err)
+	// }
 	
 	auto := Automator { 
 		// cron: cron.New(cron.WithParser(secondParser), cron.WithChain()),
@@ -279,8 +274,9 @@ func main() {
 		sensor_values: []SensorValue{},
 		device_info: make(map[string]DeviceInfo),
 	}
-
+	
 	automator = &auto
+	
 	device_info_json, err := get_device_info()
 	var device_info []DeviceInfo = []DeviceInfo{}
 	err = json.Unmarshal(device_info_json, &device_info)
@@ -289,19 +285,33 @@ func main() {
 	}
 
 	for _, di := range device_info {
-		auto.device_info[di.DeviceId] = di
+		automator.device_info[di.DeviceId] = di
 	}
 	
 	// cron := cron.New(WithParser(secondParser), WithChain())
 	println("new cron")
 	
-	auto.setup_cron()
+	// get device into automator.devices
+	GetDevices()
+
+	// println("Setting up cron")
+	// // auto.cron = cron.New(cron.WithParser(secondParser), cron.WithChain())
+	// automator.cron = cron.New(cron.WithSeconds())
+	// automator.cron.Start()
+	// defer automator.cron.Stop()
+
+	// println("Resetting controllers everyday midnight")
+	// automator.cron.AddFunc("0 0 0 * * *", func() { automator.setup_cron() })
+	
+	// automator.run_controllers()
+	
+	automator.setup_cron()
+	defer automator.cron.Stop()
 	
 	// mocking sensor_values
 	// auto.sensor_values = append([]SensorValue{}, SensorValue{ Device_id: "7", Factor: 3, Value: "59.3", Is_boolean: "false"})
 	// auto.sensor_values = append(auto.sensor_values, SensorValue{ Device_id: "7", Factor: 4, Value: "37.7", Is_boolean: "false"})
 	// auto.sensor_values = append(auto.sensor_values, SensorValue{ Device_id: "40", Factor: 1, Value: "78.9", Is_boolean: "false"})
-	
 	
 	r := mux.NewRouter()
 	
@@ -323,13 +333,13 @@ func main() {
 	// r.HandleFunc(fieldPrefix+"list", FieldList).Methods("GET", "POST")
 	// r.HandleFunc(plantPrefix+"list", PlantList).Methods("GET", "POST")
 	r.HandleFunc(devicePrefix+"info", GetDeviceInfo).Methods("GET", "POST")
-	r.HandleFunc(devicePrefix+"values", auto.DeviceValues).Methods("GET", "POST")
+	r.HandleFunc(devicePrefix+"values", automator.DeviceValues).Methods("GET", "POST")
 
 	r.HandleFunc(devicePrefix+"on/{pin}", GPIO_on).Methods("GET", "POST")
 	r.HandleFunc(devicePrefix+"off/{pin}", GPIO_off).Methods("GET", "POST")
 	
 	r.HandleFunc(controllerPrefix+"list", ControllerList).Methods("GET", "POST")
-	r.HandleFunc(controllerPrefix+"update", auto.UpdateControllers).Methods("POST")
+	r.HandleFunc(controllerPrefix+"update", automator.UpdateControllers).Methods("POST")
 
 	// implement DEVICE-ID /status /detail /get-sensor /set-control
 	r.HandleFunc(devicePrefix+"{device_id}/status", DeviceStatusHdr).Methods("GET", "POST")
@@ -386,7 +396,6 @@ func main() {
 	go http.ListenAndServe(":8080", cwa.Handler(webapp))
 	
 	log.Println("Serving NAAS Web Application + API")
-	
 
 	/* temperature, humidity, retried, err :=
 		dht.ReadDHTxxWithRetry(dht.DHT11, 37, false, 10)

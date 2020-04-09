@@ -208,6 +208,7 @@ const (
 )
 
 
+// not implemented yet, replaced by run_controllers
 // run this every day at 00:00:00
 // this function help run cron of everyday
 // first it clear active controller then it go through all controller
@@ -217,6 +218,7 @@ func (c *Controller) startScheduler() bool {
 	return true
 }
 
+// not implemented yet 
 func (c *Controller) getControllers() []Controller {
 	
 	return []Controller{}
@@ -251,9 +253,12 @@ func (auto *Automator) UpdateControllers(w http.ResponseWriter, r *http.Request)
 			return err
 		} else {
 			log.Println("set CTLS_COUNT_KEY successful")
-			auto.cron.Stop()
 			
-			auto.setup_cron()
+			// resetting devices
+			GetDevices()
+			
+			automator.cron.Stop()
+			automator.setup_cron()
 			
 			respondWithJson(w, http.StatusCreated, "{ success: true }")
 			return nil
@@ -400,62 +405,24 @@ func ControllerList(w http.ResponseWriter, r *http.Request) {
 }
 		
 func (auto *Automator) run_controllers() error {
-	log.Println("run_controllers")
+	log.Println("Running Controllers")
 	var ctls_json []byte
-	var dvs_json []byte
+	// var dvs_json []byte
 	err := bgdb.View(func(txn *badger.Txn) error {
 		
-		// Getting devices into auto.devices
-		item, err := txn.Get(DEVICE_KEY)
-		if err != nil {
-			log.Println("error getting pins_setup")
-			return nil
-		}
-		err = item.Value(func(val []byte) error {
-			log.Println("successful getting pins_setup")
-			dvs_json = append([]byte{}, val...)
-			return nil
-		})
-		if err != nil {
-			log.Println("no value on pins_setup")
-			return nil
-		}
-		log.Println(string(dvs_json))
-		
-		var devices []Device
-		err = json.Unmarshal(dvs_json, &devices)
-		if err != nil {
-			log.Println(err)
-			return nil
-		}
-		
-		log.Println("devices: ", devices)
-		
-		if len(devices) > 0 {
-			for _, device := range devices {
-				if len(device.DeviceId) > 0 {
-					auto.devices[device.Id] = device;
-					fmt.Printf("device: %s \n", device.Id)
-				}
-			}
-		}
-		
-		log.Println("devices: ", auto.devices)
-		
 		// Getting controllers into auto.ctls
-		
-		item, err = txn.Get(CTLS_KEY) 
+		item, err := txn.Get(CTLS_KEY) 
 		if err != nil {
-			log.Println("error getting ctls")
+			log.Println("Error getting controllers")
 			return nil
 		}
 		err = item.Value(func(val []byte) error {
-			log.Println("successful getting ctls")
+			log.Println("Successful getting controllers")
 			ctls_json = append([]byte{}, val...)
 			return nil
 		})
 		if err != nil {
-			log.Println("no value on ctls")
+			log.Println("No value on controllers")
 			return nil
 		}
 		log.Println(string(ctls_json))
@@ -467,7 +434,7 @@ func (auto *Automator) run_controllers() error {
 			return nil
 		}
 		
-		log.Println("controlers: ", controllers)
+		log.Println("Controlers: ", controllers)
 		
 		if len(controllers) > 0 {
 			for _, ctl := range controllers {
@@ -483,7 +450,7 @@ func (auto *Automator) run_controllers() error {
 			for _, ctl := range auto.ctls {
 				if auto.check_controller(ctl.Id) {
 					
-					log.Println("add func ", ctl.Id)
+					log.Println("Add function for controller ", ctl.Id)
 					
 					if ctl.Policy == TIME_POLICY {
 						// activate only BoolTrueDevices on time
@@ -493,36 +460,48 @@ func (auto *Automator) run_controllers() error {
 								cron := concatCronForTimePolicy(&ctl.Cron)
 								entryId, err := auto.cron.AddFunc(cron, f)
 								if err != nil {
-									log.Println("\nerror adding func f: ", err)
+									log.Println("\nError adding function f: ", err)
 								}
-								log.Println("entryId")
-								log.Println(entryId)
+								log.Println("EntryId ", entryId)
 								auto.ctl_entry_map[ctl.Id] = entryId
-								log.Println(auto.ctl_entry_map)
-								log.Println("\nTIME_POLICY ", ctl.Id, " ", cron)
+								// log.Println(auto.ctl_entry_map)
+								log.Println("TIME POLICY ", ctl.Id)
 								
 								// d := deactivate_by_time(ctl.Id, auto);
 								// auto.cron.AddFunc(cron, d)
 							}
-							// }
+						// }
 							
 					} else if ctl.Policy == MEASUREMENT_POLICY {
 						// activate based on measurement always
 						// activate_by_time(ctl.Id, auto);
 						f := resolve_control_by_measurement(&ctl, auto)
 								
-						// activate every 5 seconds
-						auto.cron.AddFunc("*/10 * * * * *", f)
-						log.Println("\nMEASUREMENT_POLICY ", ctl.Id)
+						// activate every 10 seconds
+						// auto.cron.AddFunc("*/10 * * * * *", f)
+						entryId, err := auto.cron.AddFunc("*/10 * * * * *", f)
+						if err != nil {
+							log.Println("\nError adding function f: ", err)
+						}
+						log.Println("EntryId ", entryId)
+						auto.ctl_entry_map[ctl.Id] = entryId
+						// log.Println(auto.ctl_entry_map)
+						log.Println("MEASUREMENT POLICY ", ctl.Id)
 						
 					} else if ctl.Policy == TIME_MEASUREMENT_POLICY {
 						// sensor activate based on time and measurement
-						
 						// activate_by_time(ctl.Id, auto);
 						f := resolve_control_by_measurement(&ctl, auto)
 						cron := concatCron(&ctl.Cron)
-						auto.cron.AddFunc(cron, f)
-						log.Println("\nTIME_MEASUREMENT_POLICY ", ctl.Id)
+						// automator.cron.AddFunc(cron, f)
+						entryId, err := auto.cron.AddFunc(cron, f)
+						if err != nil {
+							log.Println("\nError adding function f: ", err)
+						}
+						log.Println("EntryId ", entryId)
+						auto.ctl_entry_map[ctl.Id] = entryId
+						// log.Println(auto.ctl_entry_map)
+						log.Println("TIME MEASUREMENT POLICY ", ctl.Id)
 						// if ctl.Cron != Cron{} {
 							
 						// }
@@ -548,6 +527,7 @@ func concatCronForTimePolicy(cron *Cron) string {
 	return "*/60" + " " + cron.Minute + " " + cron.Hour + " " + cron.Dom + " " + cron.Month + " " + cron.Dow
 }
 
+// not implemented
 func (auto *Automator) check_controller(ctl_id uint16) bool {
 	// if ctl, exist := auto.ctls[ctl_id]; exist {
 	// 	if auto.ctls[ctl_id] != nil {
@@ -566,46 +546,49 @@ type Control func()
 
 // resovlign control decision based on measurement from sensor
 func resolve_control_by_measurement(controller *Controller, autom *Automator) Control {
+	log.Println("resolve_control_by_measurement")
 	ctl := controller
 	auto := autom
-	var sensor_value float32 = 7;
+	var sensor_value float32 = ctl.OptimalVal;
 	var sensor_bool bool = true;
 	return func() {
 		// fmt.Println("\nresolve_control_by_measurement: ", ctl.Id)
-		log.Println("\n\nControlStatus: ", ctl.ControlStatus)	
-		log.Println(auto.sensor_values)
+		log.Println("\n\nControlling Code ", ctl.ControlStatus)	
+		// log.Println(auto.sensor_values)
 		// read sensor from device
 		// read_sensor
-		if len(auto.devices) > 0 && len(ctl.Sensor) > 0 && reflect.TypeOf(auto.devices[ctl.Sensor]) != nil {
-			dv := auto.devices[ctl.Sensor]
-			dv.read_sensor(auto)
-			// for _, device := range auto.devices {
-			// }
+		log.Println(auto.devices)
+		if len(ctl.Sensor) > 0 && reflect.TypeOf(auto.devices[ctl.Sensor]) != nil {
+			if dv, ok := auto.devices[ctl.Sensor]; ok {
+				dv.read_sensor(auto)
+			}
 		}
 		
 		// whether update value successful
 		var update_fail = false;
 		// update sensor_value from auto.sensor_values[device_id]SensorValue
-		if len(auto.sensor_values) > 0 && len(ctl.Sensor) > 0 && ctl.Factor > 0 {
+		if len(ctl.Sensor) > 0 && ctl.Factor > 0 {
 			log.Println("updating value from sensor")
+			log.Println(auto.sensor_values)
 			for _, sv := range auto.sensor_values {
 				if len(sv.Device_id) > 0 && len(sv.Device_id) > 0 && len(sv.Value) > 0 && sv.Device_id == ctl.Sensor && uint8(ctl.Factor) == sv.Factor  {
 					if sv.Is_boolean == "true" {
 						bl, err := strconv.ParseBool(sv.Value)
 						if err != nil {
-							log.Println("parse bool false ", err)
+							update_fail = true
+							log.Println("Parsing bool false ", err)
 						}
-						log.Println("updating boolean ", bl)
+						log.Println("Updating boolean ", bl)
 						sensor_bool = bl
 					} else {
 						vl, err := strconv.ParseFloat(sv.Value, 32)
 						if err != nil {
-							log.Println("parse float false ", err)
+							update_fail = true
+							log.Println("Parsing float false ", err)
 						}
 						sensor_value = float32(vl)
-						log.Println("updating float ", vl)
+						log.Println("Updating float ", vl)
 					}
-					log.Println(sensor_value)
 				}
 			} 
 		}
@@ -613,15 +596,15 @@ func resolve_control_by_measurement(controller *Controller, autom *Automator) Co
 		// decide scheme boolean or value
 		var err error = nil
 		if ctl.ControlScheme == VALUE_CONTROL && !update_fail {
-			log.Println("VALUE_CONTROL: ", )
-			log.Println("sensor: ", fmt.Sprintf("%f", sensor_value))
-			log.Println("OptimalVal: ", ctl.OptimalVal)
-			log.Println("PreferredMax: ", ctl.PreferredMax)
-			log.Println("PreferredMin: ", ctl.PreferredMin)
+			log.Println("VALUE CONTROL")
+			log.Println("Sensor Value: ", fmt.Sprintf("%f", sensor_value))
+			log.Println("Optimal Value: ", ctl.OptimalVal)
+			log.Println("Preferred Max: ", ctl.PreferredMax)
+			log.Println("Preferred Min: ", ctl.PreferredMin)
 			
 			if sensor_value > ctl.PreferredMax && 
 			ctl.ControlStatus != CS_DECREASING_DEVICES_ACTIVE {
-				log.Println("CS_DECREASING_DEVICES_ACTIVE")
+				log.Println("Decreasing Devices Active")
 
 				// activate DecreasingDevices until reaching OptimalVal
 				if err = activateDevices(ctl.DecreasingDevices, auto); err == nil {
@@ -630,7 +613,7 @@ func resolve_control_by_measurement(controller *Controller, autom *Automator) Co
 				
 			} else if sensor_value < ctl.PreferredMin && 
 				ctl.ControlStatus != CS_INCREASING_DEVICES_ACTIVE {
-				log.Println("CS_INCREASING_DEVICES_ACTIVE")	
+				log.Println("Increasing Devices Active")	
 				// activate IncreasingDevices until reaching OptimalVal
 				if err = activateDevices(ctl.IncreasingDevices, auto); err == nil {
 					ctl.ControlStatus = CS_INCREASING_DEVICES_ACTIVE
@@ -641,7 +624,7 @@ func resolve_control_by_measurement(controller *Controller, autom *Automator) Co
 				ctl.ControlStatus == CS_INCREASING_DEVICES_ACTIVE) || (sensor_value < ctl.OptimalVal && 
 				ctl.ControlStatus == CS_DECREASING_DEVICES_ACTIVE)) {
 					
-				log.Println("CS_ONHOLD")	
+				log.Println("Devices Onhold")	
 
 				if ctl.ControlStatus == CS_INCREASING_DEVICES_ACTIVE {
 					if err = deactivateDevices(ctl.IncreasingDevices, auto); err == nil {
@@ -665,13 +648,13 @@ func resolve_control_by_measurement(controller *Controller, autom *Automator) Co
 			// }
 			
 		} else if ctl.ControlScheme == BOOLEAN_CONTROL && !update_fail {
-			log.Println("BOOLEAN_CONTROL: ", sensor_value)
+			log.Println("BOOLEAN_CONTROL")
 			log.Println("Boolean: ", sensor_bool)
 			
 			if sensor_bool == true && 
 				ctl.ControlStatus != CS_BOOL_TRUE_DEVICES_ACTIVE {
 
-				log.Println("CS_BOOL_TRUE_DEVICES_ACTIVE")		
+				log.Println("True Devices Active")		
 					// activate BoolTrueDevices
 					if err = activateDevices(ctl.BoolTrueDevices, auto); err == nil {
 						ctl.ControlStatus = CS_BOOL_TRUE_DEVICES_ACTIVE
@@ -680,56 +663,55 @@ func resolve_control_by_measurement(controller *Controller, autom *Automator) Co
 			} else if sensor_bool == false && 
 				ctl.ControlStatus != CS_BOOL_FALSE_DEVICES_ACTIVE {
 					
-				log.Println("CS_BOOL_FALSE_DEVICES_ACTIVE")	
+				log.Println("False Devices Active")	
 				// activate BoolFalseDevices
 				if err = activateDevices(ctl.BoolFalseDevices, auto); err == nil {
 					ctl.ControlStatus = CS_BOOL_FALSE_DEVICES_ACTIVE
 				}
 				
 			}
-			sensor_bool = !sensor_bool
-			
+			// sensor_bool = !sensor_bool
 		}
-		entries := auto.cron.Entries()
-		if len(entries) > 0 {
-			fmt.Println(entries)
-		}
+		// entries := auto.cron.Entries()
+		// if len(entries) > 0 {
+		// 	fmt.Println(entries)
+		// }
 	}
 }
 
 func activateDevices(device_ids []string, auto *Automator) error {
-	log.Println("activateDevices ", device_ids)
+	log.Println("Activate Devices ", device_ids)
 	for _, did := range device_ids { 
 		device, ok := auto.devices[did] 
 		if ok {
 			pin := rpio.Pin(device.GPIO)
 			pin.Output()
-			pin.Low()
-			log.Println("activate ", device.Pin)
+			pin.High()
+			log.Println("Activating Pin ", device.Pin)
 		} else if device.GPIO > 0 {
 			pin := rpio.Pin(device.GPIO)
 			pin.Output()
-			pin.High()
-			log.Println("deactivate ", device.Pin)
+			pin.Low()
+			log.Println("Deactivate Pin ", device.Pin)
 		}
 	}
 	return nil
 }
 
 func deactivateDevices(device_ids []string, auto *Automator) error {
-	log.Println("deactivateDevices ", device_ids)
+	log.Println("Deactivate Devices ", device_ids)
 	for _, did := range device_ids { 
 		device, ok := auto.devices[did]
 		if ok {
 			pin := rpio.Pin(device.GPIO)
 			pin.Output()
-			pin.High()
-			log.Println("deactivate ", device.Pin)
+			pin.Low()
+			log.Println("Deactivate Pin ", device.Pin)
 		} else if device.GPIO > 0 {
 			pin := rpio.Pin(device.GPIO)
 			pin.Output()
-			pin.Low()
-			log.Println("activate ", device.Pin)
+			pin.High()
+			log.Println("Activate Pin ", device.Pin)
 		}
 	}
 	return nil
@@ -741,7 +723,7 @@ func activate_by_time(controller_id uint16, auto *Automator) Control {
 	autoIn := auto
 	to_deactivate_next := 0
 	return func() {
-		log.Println("activate_by_time: ", ctl_id)
+		log.Println("activate by time: ", ctl_id)
 		if ctl, ok := autoIn.ctls[ctl_id]; ok {
 				
 			if len(ctl.BoolTrueDevices) > 0 { // activate && 
@@ -752,7 +734,7 @@ func activate_by_time(controller_id uint16, auto *Automator) Control {
 					deactivateDevices(ctl.BoolTrueDevices, autoIn)
 				}
 				to_deactivate_next = to_deactivate_next - 1
-				log.Println("to_deactivate_next")
+				log.Println("to deactivate next")
 				log.Println(to_deactivate_next)
 			}
 			
