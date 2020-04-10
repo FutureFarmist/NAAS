@@ -553,7 +553,7 @@ func resolve_control_by_measurement(controller *Controller, autom *Automator) Co
 	var sensor_bool bool = true;
 	return func() {
 		// fmt.Println("\nresolve_control_by_measurement: ", ctl.Id)
-		log.Println("\n\nControlling Code ", ctl.ControlStatus)	
+		// log.Println("\n\nControlling Code ", ctl.ControlStatus)	
 		// log.Println(auto.sensor_values)
 		// read sensor from device
 		// read_sensor

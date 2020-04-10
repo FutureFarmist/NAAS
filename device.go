@@ -418,18 +418,23 @@ func (auto *Automator) update_sensor_values(device_id string, ifactor Factor, iv
 func read_from_dht(gpio string, dht string) (string, string, error){
 	
 	// expect true,temp,humi -> true,35.3,49.5
-	cmd, err := exec.Command("python", "dht.py", dht, gpio).Output()
-	fmt.Println("Running dht.py ", dht, gpio)
-	// Wait for the Python program to exit.
-	// err = cmd.Run()
+	cmd := exec.Command("python", "dht.py", dht, gpio)//.CombinedOutput()
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		// cmd = string(cmd)
+		log.Fatal(err)
+	}
+	fmt.Println("Running dht.py ", dht, gpio, "Waiting for command to finish...")
+
+	output, _ := ioutil.ReadAll(stdout)
+	fmt.Printf("%s\n", output)
+	if err := cmd.Wait(); err != nil {
 		fmt.Println("err:", err)
 		return "","",errors.New("fail reading DHT11")
 	}
-	fmt.Println("DHT11: ", string(cmd))
+
+	fmt.Println("DHT11: ", string(output))
 	
-	th := strings.Split(strings.TrimSuffix(string(cmd), "\n"), ",")
+	th := strings.Split(strings.TrimSuffix(string(output), "\n"), ",")
 	// in c
 	temp := th[1]
 	// in %
