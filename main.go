@@ -18,7 +18,7 @@ import (
 	"github.com/rs/cors"
 	// "github.com/BurntSushi/toml"
 
-	"github.com/stianeikeland/go-rpio"
+	// "github.com/stianeikeland/go-rpio"
 	
 	badger "github.com/dgraph-io/badger"
 	// "github.com/dgraph-io/badger/v2/options"
@@ -203,10 +203,10 @@ func loggingMiddleware(next http.Handler) http.Handler {
 
 func main() {
 	infinite_wait := make(chan string)
-	if err := rpio.Open(); err != nil {
-		panic(err)
-	}
-	defer rpio.Close()
+	// if err := rpio.Open(); err != nil {
+	// 	panic(err)
+	// }
+	// defer rpio.Close()
 
 	// dbOpts := badger.DefaultOptions("naas-db").
 	// 	WithSyncWrites(false).
@@ -366,34 +366,39 @@ func main() {
 	// implementing PLANT-ID /device-list
 	// r.HandleFunc(plantPrefix+"{plant_id}", PlantData).Methods("GET", "POST")
 	// r.HandleFunc(plantPrefix + "{plant_id}/device-list", PlantDeviceList).Methods("POST")
+	// http.Handle("/", http.FileServer(http.Dir("/tmp")))
+	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./web-app/")))
+	// r.PathPrefix("/").Handler(http.StripPrefix("/", http.FileServer(http.Dir("./web-app/"))))
+
+	// r.PathPrefix("/").Handler(http.Handle("/", http.FileServer(http.Dir("./web-app/"))))
 	
-	
-	c := cors.New(cors.Options{
-		AllowedMethods:     []string{"GET", "POST", "PUT", "HEAD", "OPTIONS"}, //
-		AllowedOrigins:     []string{"*"},
-		AllowCredentials:   true,
-		AllowedHeaders:     []string{"Content-Type", "Bearer", "Bearer ", "content-type", "Origin", "Accept"},
-		OptionsPassthrough: false,
-	})	
-	go http.ListenAndServe(":3030", loggingMiddleware(c.Handler(r)))
+	// c := cors.New(cors.Options{
+	// 	AllowedMethods:     []string{"GET", "POST", "PUT", "HEAD", "OPTIONS"}, //
+	// 	AllowedOrigins:     []string{"*"},
+	// 	AllowCredentials:   true,
+	// 	AllowedHeaders:     []string{"Content-Type", "Bearer", "Bearer ", "content-type", "Origin", "Accept"},
+	// 	OptionsPassthrough: false,
+	// })	
+	// go http.ListenAndServe(":3030", loggingMiddleware(c.Handler(r)))
 	
 	// box := rice.MustFindBox("web-app")
 	// webappFileServer := http.StripPrefix("/", http.FileServer(box.HTTPBox()))
 	// r.PathPrefix("/").Handler(http.FileServer(rice.MustFindBox("web-app").HTTPBox()))
 	// fs := http.FileServer(http.Dir("web-app"))
 	// webapp := http.NewServeMux()
-	webapp := mux.NewRouter()
-	// webapp.Handle("/", fs)
-	webapp.PathPrefix("/").Handler(http.FileServer(http.Dir("./web-app/")))
+	// // webapp.Handle("/", fs)
 	
-	cwa := cors.New(cors.Options{
-		AllowedMethods:     []string{"GET", "POST", "PUT", "HEAD", "OPTIONS"}, //
-		AllowedOrigins:     []string{"*"},
-		AllowCredentials:   true,
-		AllowedHeaders:     []string{"Content-Type", "Bearer", "Bearer ", "content-type", "Origin", "Accept"},
-		OptionsPassthrough: false,
-	})	
-	go http.ListenAndServe(":8080", cwa.Handler(webapp))
+	// webapp := mux.NewRouter()
+	// webapp.PathPrefix("/").Handler(http.FileServer(http.Dir("./web-app/")))
+	
+	// cwa := cors.New(cors.Options{
+	// 	AllowedMethods:     []string{"GET", "POST", "PUT", "HEAD", "OPTIONS"}, //
+	// 	AllowedOrigins:     []string{"*"},
+	// 	AllowCredentials:   true,
+	// 	AllowedHeaders:     []string{"Content-Type", "Bearer", "Bearer ", "content-type", "Origin", "Accept"},
+	// 	OptionsPassthrough: false,
+	// })	
+	go http.ListenAndServe(":8080", cwa.Handler(r))
 	
 	log.Println("Serving NAAS Web Application + API")
 
