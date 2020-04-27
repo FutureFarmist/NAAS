@@ -18,7 +18,7 @@ import (
 	"github.com/rs/cors"
 	// "github.com/BurntSushi/toml"
 
-	// "github.com/stianeikeland/go-rpio"
+	"github.com/stianeikeland/go-rpio"
 	
 	badger "github.com/dgraph-io/badger"
 	// "github.com/dgraph-io/badger/v2/options"
@@ -92,6 +92,7 @@ func (auto Automator) setup_cron() error {
 
 	println("Resetting controllers everyday midnight")
 	auto.cron.AddFunc("0 0 0 * * *", func() { auto.setup_cron() })
+	auto.cron.AddFunc("*/10 * * * * *", func() { capture_image() })
 	
 	auto.run_controllers()
 	
@@ -203,10 +204,10 @@ func loggingMiddleware(next http.Handler) http.Handler {
 
 func main() {
 	infinite_wait := make(chan string)
-	// if err := rpio.Open(); err != nil {
-	// 	panic(err)
-	// }
-	// defer rpio.Close()
+	if err := rpio.Open(); err != nil {
+		panic(err)
+	}
+	defer rpio.Close()
 
 	// dbOpts := badger.DefaultOptions("naas-db").
 	// 	WithSyncWrites(false).
@@ -391,17 +392,17 @@ func main() {
 	// webapp := mux.NewRouter()
 	// webapp.PathPrefix("/").Handler(http.FileServer(http.Dir("./web-app/")))
 	
-	// cwa := cors.New(cors.Options{
-	// 	AllowedMethods:     []string{"GET", "POST", "PUT", "HEAD", "OPTIONS"}, //
-	// 	AllowedOrigins:     []string{"*"},
-	// 	AllowCredentials:   true,
-	// 	AllowedHeaders:     []string{"Content-Type", "Bearer", "Bearer ", "content-type", "Origin", "Accept"},
-	// 	OptionsPassthrough: false,
-	// })	
+	cwa := cors.New(cors.Options{
+		AllowedMethods:     []string{"GET", "POST", "PUT", "HEAD", "OPTIONS"}, //
+		AllowedOrigins:     []string{"*"},
+		AllowCredentials:   true,
+		AllowedHeaders:     []string{"Content-Type", "Bearer", "Bearer ", "content-type", "Origin", "Accept"},
+		OptionsPassthrough: false,
+	})	
 	go http.ListenAndServe(":8080", cwa.Handler(r))
 	
+	capture_image()
 	log.Println("Serving NAAS Web Application + API")
-
 	/* temperature, humidity, retried, err :=
 		dht.ReadDHTxxWithRetry(dht.DHT11, 37, false, 10)
 	if err != nil {

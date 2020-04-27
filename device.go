@@ -416,15 +416,39 @@ func (auto *Automator) update_sensor_values(device_id string, ifactor Factor, iv
 }
 
 func read_from_dht(gpio string, dht string) (string, string, error){
-	
+	// var stdout, stderr []byte
+	// var errStdout, errStderr error
 	// expect true,temp,humi -> true,35.3,49.5
 	cmd := exec.Command("python", "dht.py", dht, gpio)//.CombinedOutput()
 	stdout, err := cmd.StdoutPipe()
+	// stderrIn, err := cmd.StderrPipe()
 	if err != nil {
 		log.Fatal(err)
 	}
+	err = cmd.Start()
 	fmt.Println("Running dht.py ", dht, gpio, "Waiting for command to finish...")
+	
+	// var wg sync.WaitGroup
+	// wg.Add(1)
+	// go func() {
+	// 	stdout, errStdout = copyAndCapture(os.Stdout, stdoutIn)
+	// 	wg.Done()
+	// }()
+	
+	// stderr, errStderr = copyAndCapture(os.Stderr, stderrIn)
 
+	// wg.Wait()
+
+	// err = cmd.Wait()
+	// if err != nil {
+		// log.Fatalf("cmd.Run() failed with %s\n", err)
+	// }
+	// if errStdout != nil || errStderr != nil {
+	// 	log.Fatal("failed to capture stdout or stderr\n")
+	// }
+	// outStr, errStr := string(stdout), string(stderr)
+	// fmt.Printf("\nout:\n%s\nerr:\n%s\n", outStr, errStr)
+	
 	output, _ := ioutil.ReadAll(stdout)
 	fmt.Printf("%s\n", output)
 	if err := cmd.Wait(); err != nil {
@@ -442,6 +466,57 @@ func read_from_dht(gpio string, dht string) (string, string, error){
 	
 	return humi, temp, nil
 }
+// func read_from_dht(gpio string, dht string) (string, string, error){
+// 	var stdout, stderr []byte
+// 	var errStdout, errStderr error
+// 	// expect true,temp,humi -> true,35.3,49.5
+// 	cmd := exec.Command("python", "dht.py", dht, gpio)//.CombinedOutput()
+// 	stdoutIn, err := cmd.StdoutPipe()
+// 	stderrIn, err := cmd.StderrPipe()
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+// 	err := cmd.Start()
+// 	fmt.Println("Running dht.py ", dht, gpio, "Waiting for command to finish...")
+	
+// 	var wg sync.WaitGroup
+// 	wg.Add(1)
+// 	go func() {
+// 		stdout, errStdout = copyAndCapture(os.Stdout, stdoutIn)
+// 		wg.Done()
+// 	}()
+	
+// 	stderr, errStderr = copyAndCapture(os.Stderr, stderrIn)
+
+// 	wg.Wait()
+
+// 	err = cmd.Wait()
+// 	if err != nil {
+// 		log.Fatalf("cmd.Run() failed with %s\n", err)
+// 	}
+// 	if errStdout != nil || errStderr != nil {
+// 		log.Fatal("failed to capture stdout or stderr\n")
+// 	}
+// 	outStr, errStr := string(stdout), string(stderr)
+// 	fmt.Printf("\nout:\n%s\nerr:\n%s\n", outStr, errStr)
+	
+// 	output, _ := ioutil.ReadAll(stdout)
+// 	fmt.Printf("%s\n", output)
+// 	if err := cmd.Wait(); err != nil {
+// 		fmt.Println("err:", err)
+// 		return "","",errors.New("fail reading DHT11")
+// 	}
+
+// 	fmt.Println("DHT11: ", string(output))
+	
+// 	th := strings.Split(strings.TrimSuffix(string(output), "\n"), ",")
+// 	// in c
+// 	temp := th[1]
+// 	// in %
+// 	humi := th[2]
+	
+// 	return humi, temp, nil
+// }
 
 func read_sms_lm393(gpio uint8) (string, error) {
 	log.Println("read_sms_lm393")
@@ -501,4 +576,22 @@ func clear_devices() {
 		}	
 			return nil
 	})
+}
+
+func capture_image() {
+	cmd := exec.Command("raspistill", "-o", "web-app/image.png", "-e", "png")//.CombinedOutput()
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = cmd.Start()
+	fmt.Println("Capturing image...")
+	
+	output, _ := ioutil.ReadAll(stdout)
+	// fmt.Printf("%s\n", output)
+	if err := cmd.Wait(); err != nil {
+		fmt.Println("err:", err)
+	}
+
+	fmt.Println("raspistill: ", string(output))
 }
