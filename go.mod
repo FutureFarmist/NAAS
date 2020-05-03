@@ -41,4 +41,4 @@ require (
 	periph.io/x/extra v0.0.0-20200225150845-c5a4b83ade91 // indirect
 )
 
-replace github.com/dgraph-io/badger => ../badger
+// replace github.com/dgraph-io/badger => ../badger
